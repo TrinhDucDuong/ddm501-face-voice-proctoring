@@ -1,0 +1,50 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "type": "stat", "title": "Verification rate", "id": 1,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum(rate(biometric_verifications_total[5m]))", "legendFormat": "requests/s"}],
+      "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+    },
+    {
+      "type": "piechart", "title": "Decisions (24h)", "id": 2,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"expr": "sum by (decision) (increase(biometric_verifications_total[24h]))", "legendFormat": "{{decision}}"}],
+      "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0}
+    },
+    {
+      "type": "timeseries", "title": "Verification latency p50/p95", "id": 3,
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by (le) (rate(biometric_verification_seconds_bucket[5m])))", "legendFormat": "p50"},
+        {"expr": "histogram_quantile(0.95, sum by (le) (rate(biometric_verification_seconds_bucket[5m])))", "legendFormat": "p95"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+    },
+    {
+      "type": "timeseries", "title": "Risk score", "id": 4,
+      "datasource": {"type": "postgres", "uid": "biometric-postgres"},
+      "targets": [{"format": "time_series", "rawSql": "SELECT created_at AS time, risk_score AS value FROM verification_events WHERE $__timeFilter(created_at) ORDER BY created_at", "refId": "A"}],
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 8}
+    },
+    {
+      "type": "table", "title": "Recent review queue", "id": 5,
+      "datasource": {"type": "postgres", "uid": "biometric-postgres"},
+      "targets": [{"format": "table", "rawSql": "SELECT created_at, session_id, person_id, risk_score, face_score, voice_score, reasons, model_version FROM verification_events WHERE accepted = false ORDER BY created_at DESC LIMIT 100", "refId": "A"}],
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 8}
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 41,
+  "tags": ["ddm501", "biometrics"],
+  "templating": {"list": []},
+  "time": {"from": "now-24h", "to": "now"},
+  "timezone": "browser",
+  "title": "Face + Voice Integrity Overview",
+  "uid": "biometric-overview",
+  "version": 1
+}
+

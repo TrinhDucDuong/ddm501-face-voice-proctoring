@@ -1,0 +1,10 @@
+# Keep Airflow's constrained SQLAlchemy and provider versions intact.
+requests==2.32.3
+mlflow==2.22.0
+# Match Airflow's preinstalled aiobotocore/botocore compatibility window.
+boto3==1.36.3
+psycopg2-binary==2.9.10
+numpy==1.26.4
+# Preserve Airflow 2.10.5 provider compatibility while satisfying MLflow.
+protobuf==4.25.6
+cloudpickle==2.2.1

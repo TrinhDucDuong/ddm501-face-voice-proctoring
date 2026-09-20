@@ -1,0 +1,15 @@
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+data/*
+!data/.gitkeep
+models/*
+!models/.gitkeep
+airflow/logs/
+postgres-data/
+minio-data/
+mlflow-data/
+
