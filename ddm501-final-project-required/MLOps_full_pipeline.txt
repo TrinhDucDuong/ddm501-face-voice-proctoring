@@ -1,0 +1,14 @@
+airflow: data->clean&feature engineering->train->evaluate->ML(API/gprc/websocket/...)->serving->monitoring&operation
+MLflow: data->clean&feature engineering->train->evaluate
+ML(API/gprc/websocket/...) quản lý version trong MLflow
+
+DDM501 tập trung vào phần serving->monitoring&operation
+
+dùng: paramethery/grafan/cicd left-hand runner
+dùng evidently để monitoring performance
+
+trong phần serving(monitoring&operation) sau API, cần code simulation để tính được Data drift và PSI
+sau api: grafan, paramethery, evidently, tự động hóa, alert
+
+mỗi nửa là 5/10 điểm: {(airflow-> training pipeline -> registry -> mlflow -> API(để kéo về)) -> (grafan, paramethus, evidently)}
+

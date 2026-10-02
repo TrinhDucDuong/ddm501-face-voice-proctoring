@@ -1,0 +1,2 @@
+# Optional but enabled by the default API image. Dockerfile installs CPU-only torch first.
+speechbrain==1.0.3

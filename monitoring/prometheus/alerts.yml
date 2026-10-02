@@ -1,0 +1,111 @@
+groups:
+  - name: biometric-ml
+    rules:
+      - alert: IntegrityDetectorUnavailable
+        expr: biometric_integrity_capability_ready == 0
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "Capture integrity detector unavailable; customer checks may be inconclusive"
+      - alert: EvidenceStorageFailed
+        expr: increase(biometric_evidence_writes_total{outcome="failure"}[5m]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "Suspicious-check evidence could not be persisted"
+      - alert: BiometricSyntheticPerformanceDegraded
+        expr: biometric_reviewed_performance{source="synthetic",metric="accuracy",window="current"} < 0.8 and on(source) biometric_reviewed_report_success{source="synthetic"} == 1
+        for: 2m
+        labels: {severity: info, evidence: synthetic_demo}
+        annotations:
+          summary: "Synthetic monitoring scenario degraded; this is not human accuracy"
+      - alert: PlatformServiceUnavailable
+        expr: biometric_service_health == 0
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "Platform service readiness failed"
+      - alert: OperationalCollectorFailed
+        expr: biometric_ops_collection_success == 0
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "Operational telemetry collection failed"
+      - alert: TrainingDataInvalid
+        expr: biometric_training_data_valid == 0
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "Training feature data failed validation"
+      - alert: TelegramDeliveryFailed
+        expr: increase(biometric_alert_notifications_total{outcome="failure"}[5m]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "Telegram notification failed; check configured credentials and connectivity"
+      - alert: WebhookDeliveryFailed
+        expr: biometric_webhook_backlog{status="failed"} > 0
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "Webhook delivery exhausted retries; inspect tenant outbox"
+      - alert: WebhookWorkerDown
+        expr: up{job="webhook-worker"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "Webhook worker is unavailable"
+      - alert: BiometricPerformanceDegraded
+        expr: biometric_model_performance{metric="accuracy",window="current"} < 0.8 and on() biometric_performance_report_success == 1
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Accuracy on the latest reviewed window is below 80%"
+      - alert: BiometricDataDrift
+        expr: max(biometric_feature_psi) > 0.2
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "Biometric input drift detected"
+          description: "At least one production feature has PSI > 0.2 for 2 minutes."
+      - alert: BiometricTenantDataDrift
+        expr: biometric_monitor_tenant_psi > 0.2
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "Tenant feature drift; inspect the versioned monitoring window"
+          description: "Tenant {{ $labels.tenant }}, model {{ $labels.model_version }}, feature {{ $labels.feature }} has PSI {{ $value }}. Check sample counts and review the monitoring DAG before retraining."
+      - alert: BiometricRetrainRecommended
+        expr: biometric_retrain_recommended == 1
+        for: 2m
+        labels: {severity: info}
+        annotations:
+          summary: "Monitoring evidence requested challenger training; promotion still requires paired and reviewed gates"
+      - alert: MonitoringETLStale
+        expr: time() - biometric_monitoring_etl_unixtime > 7200
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Batch monitoring DAG has not produced fresh evidence for two hours"
+      - alert: BiometricHighReviewRate
+        expr: sum(rate(biometric_verifications_total{decision="review"}[10m])) / clamp_min(sum(rate(biometric_verifications_total[10m])), 0.001) > 0.35
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Review rate is above 35%"
+      - alert: BiometricHighLatency
+        expr: histogram_quantile(0.95, sum by (le) (rate(biometric_verification_seconds_bucket[5m]))) > 2
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "p95 verification latency is above 2 seconds"
+      - alert: BiometricAPIDown
+        expr: up{job="biometric-api"} == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "Biometric API is unavailable"
+      - alert: DriftMonitorStale
+        expr: time() - biometric_monitor_last_success_unixtime > 300
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "Drift monitor has not completed for five minutes"

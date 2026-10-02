@@ -1,0 +1,6 @@
+[run]
+omit =
+    */app/vendor/*
+
+# Upstream AASIST research architecture is vendored with MIT attribution.
+# Coverage still includes all first-party app code, including integrity wrappers.

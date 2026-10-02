@@ -1,0 +1,3 @@
+-r requirements-api.txt
+-r requirements-pipeline.txt
+-r requirements-monitoring.txt

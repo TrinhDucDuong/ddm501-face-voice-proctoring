@@ -1,0 +1,12 @@
+route:
+  receiver: project-notifications
+  group_by: [alertname]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+receivers:
+  - name: project-notifications
+    webhook_configs:
+      - url: http://ops-monitor:8003/alerts
+        send_resolved: true
+# ops-monitor forwards to Telegram only when TELEGRAM_BOT_TOKEN/CHAT_ID are configured.

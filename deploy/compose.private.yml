@@ -1,0 +1,24 @@
+# Overlay: docker compose --env-file .env.private -f docker-compose.yml -f deploy/compose.private.yml up -d --build
+# DNS/TLS/VPN and customer secrets must be configured by the deployment operator first.
+services:
+  model-init:
+    environment:
+      OFFLINE_MODE: ${OFFLINE_MODE:-false}
+  api:
+    environment:
+      ENABLE_SIMULATION: "false"
+      ALLOW_INSECURE_WEBHOOKS: "false"
+      PUBLIC_API_URL: ${PUBLIC_API_URL:?Set the customer HTTPS verification URL}
+      WEBHOOK_ALLOWED_HOSTS: ${WEBHOOK_ALLOWED_HOSTS:?Set approved customer callback hosts}
+      WEBHOOK_MASTER_KEY: ${WEBHOOK_MASTER_KEY:?Set a stable independent webhook secret}
+      SESSION_SIGNING_KEY: ${SESSION_SIGNING_KEY:?Set a stable independent session secret}
+  webhook-worker:
+    environment:
+      ALLOW_INSECURE_WEBHOOKS: "false"
+      WEBHOOK_ALLOWED_HOSTS: ${WEBHOOK_ALLOWED_HOSTS:?Set approved customer callback hosts}
+      WEBHOOK_MASTER_KEY: ${WEBHOOK_MASTER_KEY:?Set the same secret as API}
+  legacy-demo:
+    profiles: [demo]
+  ops-monitor:
+    environment:
+      OPS_DISABLED_PROBES: legacy

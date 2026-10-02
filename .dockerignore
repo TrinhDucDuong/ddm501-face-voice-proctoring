@@ -1,0 +1,15 @@
+.git
+.env
+.env.*
+!.env.example
+.venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+data
+reports
+airflow/logs
+**/.cache
+ddm501-final-project-required
