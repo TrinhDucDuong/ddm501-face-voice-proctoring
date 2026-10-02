@@ -55,9 +55,9 @@ Airflow: snapshot → validate → identity evaluation/register → RAI audit �
 
 ## CI/CD GitHub trên repo FSB, 02/10/2026
 
-Repo `FSB-MSA36HN/DDM501-face-voice-proctoring` triển khai demo bằng runner Ubuntu 24.04 trong WSL với nhãn `self-hosted`, `Linux`, `ddm501-linux-demo`. Runner chạy dưới systemd với tài khoản `ddm501runner`; checkout nằm trên ổ C và job gọi `powershell.exe` để dùng Python runtime, Docker Desktop, `.env` và volumes Windows đã có. Job chỉ chạy trên `main` sau `quality` và `containers`; PR không được deploy. `pipeline/deploy_local.ps1` kiểm tra SHA đầy đủ, stage release ngoài OneDrive, build Compose, chờ health và kiểm tra Grafana. Bản cũ chạy trên Windows bị Code Integrity chặn `Runner.Worker.exe` (event 3033/3077), nên không dùng runner đó cho repo FSB.
+Repo `FSB-MSA36HN/DDM501-face-voice-proctoring` triển khai demo bằng runner Ubuntu 24.04 trong WSL với nhãn `self-hosted`, `Linux`, `ddm501-linux-demo`. Runner chạy dưới systemd với tài khoản `ddm501runner`; thư mục work của runner nằm trên ext4 để `actions/checkout` giải nén được. Job sao chép đúng checkout sang `%LOCALAPPDATA%/DDM501/runner-checkouts/<run-id>-<attempt>` trên ổ C rồi gọi `powershell.exe` để dùng Python runtime, Docker Desktop, `.env` và volumes Windows đã có. Hai đường dẫn runtime và checkout root nằm trong systemd drop-in `runtime.conf`. Job chỉ chạy trên `main` sau `quality` và `containers`; PR không được deploy. `pipeline/deploy_local.ps1` kiểm tra SHA đầy đủ, stage release ngoài OneDrive, build Compose, chờ health và kiểm tra Grafana. Bản cũ chạy trên Windows bị Code Integrity chặn `Runner.Worker.exe` (event 3033/3077), nên không dùng runner đó cho repo FSB.
 
-Sau khi khởi động lại Windows, Docker Desktop cần chạy và distro WSL `Ubuntu-24.04` cần được khởi động để systemd đưa runner online. Kiểm tra bằng:
+Sau khi khởi động lại Windows, shortcut trong Startup của người dùng mở Docker Desktop và giữ một phiên `Ubuntu-24.04` chạy nền để systemd đưa runner online. Kiểm tra bằng:
 
 ```powershell
 docker desktop start
