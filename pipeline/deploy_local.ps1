@@ -43,10 +43,10 @@ try {
         return
     }
 
-    & docker compose up -d --build --wait --wait-timeout 300
+    & docker compose up -d --build
     if ($LASTEXITCODE -ne 0) { throw 'Docker Compose deployment failed.' }
 
-    foreach ($url in @(
+    $urls = @(
         'http://localhost:18100/ready',
         'http://localhost:18501/_stcore/health',
         'http://localhost:18600/',
@@ -56,8 +56,24 @@ try {
         'http://localhost:19090/-/ready',
         'http://localhost:18001/metrics',
         'http://localhost:18003/metrics/'
-    )) {
-        $null = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 30
+    )
+    $deadline = (Get-Date).AddMinutes(12)
+    do {
+        $pending = @()
+        foreach ($url in $urls) {
+            try {
+                $null = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 10
+            } catch {
+                $pending += $url
+            }
+        }
+        if ($pending.Count -eq 0) { break }
+        Write-Output "Waiting for $($pending.Count) demo endpoints."
+        Start-Sleep -Seconds 10
+    } while ((Get-Date) -lt $deadline)
+    if ($pending.Count -gt 0) {
+        & docker compose ps
+        throw "Demo endpoints did not become ready: $($pending -join ', ')"
     }
 
     & $runtimePython pipeline/verify_monitoring_centre.py
