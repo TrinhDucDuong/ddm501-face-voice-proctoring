@@ -62,17 +62,24 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${DDM501_RUNTIME_ROOT:-}"
+          test -n "${DDM501_WINDOWS_CHECKOUT_ROOT:-}"
           test -f "$DDM501_RUNTIME_ROOT/.env"
           for attempt in $(seq 1 60); do
             if docker.exe info >/dev/null 2>&1; then break; fi
             sleep 5
           done
           docker.exe info >/dev/null
-          script="$(wslpath -w "$(realpath pipeline/deploy_local.ps1)")"
-          workspace="$(wslpath -w "$(realpath .)")"
+          windows_checkout="$DDM501_WINDOWS_CHECKOUT_ROOT/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -p "$windows_checkout"
+          cp -r "$GITHUB_WORKSPACE/." "$windows_checkout/"
+          script="$(wslpath -w "$windows_checkout/pipeline/deploy_local.ps1")"
+          workspace="$(wslpath -w "$windows_checkout")"
           runtime="$(wslpath -w "$(realpath "$DDM501_RUNTIME_ROOT")")"
           powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass \
             -File "$script" -Workspace "$workspace" -RuntimeRoot "$runtime" -Revision "$GITHUB_SHA"
+          mkdir -p "$GITHUB_WORKSPACE/reports"
+          cp "$windows_checkout/reports/deployment-monitoring-verification.json" \
+            "$GITHUB_WORKSPACE/reports/deployment-monitoring-verification.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
