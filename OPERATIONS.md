@@ -53,7 +53,20 @@ Inference/SaaS tạo thêm event demo. Recovery lưu dump dưới `data/backups/
 
 Airflow: snapshot → validate → identity evaluation/register → RAI audit → gate → reload. Calibration/CV/holdout FAR và FRR phải ≤20% ở demo; snapshot candidate phải khớp run. `REQUIRE_HUMAN_FAIRNESS=true` chặn cả insufficient evidence.
 
-## CI/CD GitHub
+## CI/CD GitHub trên repo FSB, 02/10/2026
+
+Repo `FSB-MSA36HN/DDM501-face-voice-proctoring` triển khai demo bằng runner Ubuntu 24.04 trong WSL với nhãn `self-hosted`, `Linux`, `ddm501-linux-demo`. Runner chạy dưới systemd với tài khoản `ddm501runner`; checkout nằm trên ổ C và job gọi `powershell.exe` để dùng Python runtime, Docker Desktop, `.env` và volumes Windows đã có. Job chỉ chạy trên `main` sau `quality` và `containers`; PR không được deploy. `pipeline/deploy_local.ps1` kiểm tra SHA đầy đủ, stage release ngoài OneDrive, build Compose, chờ health và kiểm tra Grafana. Bản cũ chạy trên Windows bị Code Integrity chặn `Runner.Worker.exe` (event 3033/3077), nên không dùng runner đó cho repo FSB.
+
+Sau khi khởi động lại Windows, Docker Desktop cần chạy và distro WSL `Ubuntu-24.04` cần được khởi động để systemd đưa runner online. Kiểm tra bằng:
+
+```powershell
+docker desktop start
+wsl -d Ubuntu-24.04 -u root -- systemctl status actions.runner.FSB-MSA36HN-DDM501-face-voice-proctoring.ddm501-fsb-linux-demo.service --no-pager
+```
+
+Nếu WSL báo runner offline, dùng `wsl -d Ubuntu-24.04 -u root -- systemctl restart actions.runner.FSB-MSA36HN-DDM501-face-voice-proctoring.ddm501-fsb-linux-demo.service`. Runtime root của runner đặt trong systemd drop-in `runtime.conf` và trỏ tới repo local giữ `.env`, models, data, reports; không đưa các file này lên GitHub. Các container tutorial cũ đã được dừng và đặt `restart=no` để RAM 6 GB của WSL phục vụ stack chính. Nếu WSL service kẹt sau khi Docker quá tải, dừng Docker Desktop rồi khởi động lại `WslService` bằng quyền quản trị Windows.
+
+## CI/CD GitHub trước 02/10 (lịch sử)
 
 **Tình trạng 01/10/2026:** job `quality` và `containers` trên GitHub-hosted runner qua, nhưng `deploy-demo` trên máy này chưa thể chạy tự động: Windows Code Integrity chặn `Runner.Worker.dll` vì không đạt Enterprise signing policy (`0x800711C7`). Chuyển runner ra ngoài OneDrive không giải quyết được. Không tắt chính sách này; cần IT cho phép binary runner hoặc dùng runner Windows đã được phê duyệt. Cho đến khi đó, triển khai local bằng `pipeline/prepare_runner_env.py --stage-deployment` và `docker compose up -d --build`, sau đó chạy `pipeline/verify_stack.py`. Xem kết quả trong `VERIFICATION.md`.
 
