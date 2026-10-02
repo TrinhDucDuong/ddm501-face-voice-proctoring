@@ -45,13 +45,10 @@ jobs:
       - run: docker compose build api ui drift-monitor ops-monitor airflow-scheduler webhook-worker legacy-demo
 
   deploy-demo:
-    defaults:
-      run:
-        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File {0}
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy))
-    runs-on: [self-hosted, Windows, ddm501-demo]
+    runs-on: [self-hosted, Linux, ddm501-linux-demo]
     needs: containers
     environment: demo
     concurrency:
@@ -60,53 +57,24 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-        with:
-          clean: false
-      - name: Use the authorized runtime Python
+      - name: Deploy and verify on local Docker Desktop
+        shell: bash
         run: |
-          $runtimePython = Join-Path $env:DDM501_RUNTIME_ROOT '.venv/Scripts/python.exe'
-          if (-not (Test-Path -LiteralPath $runtimePython)) { throw 'Runtime Python is missing' }
-          & $runtimePython -c "import sys, dotenv, requests; assert sys.version_info >= (3, 10); print(sys.version)"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Split-Path -Parent $runtimePython | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      - name: Reuse authorized local secrets and persistence
-        run: |
-          $deployPath = python pipeline/prepare_runner_env.py --stage-deployment
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          "DDM501_DEPLOY_PATH=$deployPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - run: |
-          docker compose config --quiet
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        working-directory: ${{ env.DDM501_DEPLOY_PATH }}
-      - run: |
-          docker compose up -d --build
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        working-directory: ${{ env.DDM501_DEPLOY_PATH }}
-      - name: Smoke test
-        working-directory: ${{ env.DDM501_DEPLOY_PATH }}
-        run: |
-          for ($attempt = 0; $attempt -lt 30; $attempt++) {
-            try {
-              $null = Invoke-RestMethod http://localhost:18100/ready
-              exit 0
-            } catch { Start-Sleep -Seconds 10 }
-          }
-          docker compose ps
-          exit 1
-      - name: Monitoring smoke test
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $null = Invoke-WebRequest -UseBasicParsing http://localhost:18001/metrics
-          $null = Invoke-WebRequest -UseBasicParsing http://localhost:18003/metrics/
-          $null = Invoke-WebRequest -UseBasicParsing http://localhost:19090/-/ready
-          $null = Invoke-RestMethod http://localhost:13000/api/health
-      - name: Verify Grafana dashboard and protected reports
-        working-directory: ${{ env.DDM501_DEPLOY_PATH }}
-        run: |
-          python pipeline/verify_monitoring_centre.py
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          set -euo pipefail
+          test -n "${DDM501_RUNTIME_ROOT:-}"
+          test -f "$DDM501_RUNTIME_ROOT/.env"
+          for attempt in $(seq 1 60); do
+            if docker.exe info >/dev/null 2>&1; then break; fi
+            sleep 5
+          done
+          docker.exe info >/dev/null
+          script="$(wslpath -w "$(realpath pipeline/deploy_local.ps1)")"
+          workspace="$(wslpath -w "$(realpath .)")"
+          runtime="$(wslpath -w "$(realpath "$DDM501_RUNTIME_ROOT")")"
+          powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass \
+            -File "$script" -Workspace "$workspace" -RuntimeRoot "$runtime" -Revision "$GITHUB_SHA"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: deployment-monitoring-evidence
-          path: ${{ env.DDM501_DEPLOY_PATH }}/reports/monitoring-verification.json
+          path: reports/deployment-monitoring-verification.json
