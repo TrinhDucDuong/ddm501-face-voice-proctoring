@@ -76,15 +76,21 @@ try {
         throw "Demo endpoints did not become ready: $($pending -join ', ')"
     }
 
-    & $runtimePython pipeline/verify_monitoring_centre.py
-    if ($LASTEXITCODE -ne 0) { throw 'Monitoring verification failed.' }
     $report = Join-Path $deployPath 'reports\monitoring-verification.json'
-    if (-not (Test-Path -LiteralPath $report -PathType Leaf)) {
-        throw 'Monitoring verification report is missing.'
-    }
     $artifactDirectory = Join-Path $Workspace 'reports'
     New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
-    Copy-Item -LiteralPath $report -Destination (Join-Path $artifactDirectory 'deployment-monitoring-verification.json') -Force
+    $verified = $false
+    for ($attempt = 1; $attempt -le 16; $attempt++) {
+        & $runtimePython pipeline/verify_monitoring_centre.py
+        $verified = ($LASTEXITCODE -eq 0)
+        if (Test-Path -LiteralPath $report -PathType Leaf) {
+            Copy-Item -LiteralPath $report -Destination (Join-Path $artifactDirectory 'deployment-monitoring-verification.json') -Force
+        }
+        if ($verified) { break }
+        if ($attempt -lt 16) { Start-Sleep -Seconds 15 }
+    }
+    if (-not $verified) { throw 'Monitoring verification failed after 16 attempts.' }
+    if (-not (Test-Path -LiteralPath $report -PathType Leaf)) { throw 'Monitoring verification report is missing.' }
     Write-Output "Deployment verified: $Revision"
 } finally {
     Pop-Location

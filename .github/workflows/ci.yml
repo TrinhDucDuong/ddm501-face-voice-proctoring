@@ -75,11 +75,15 @@ jobs:
           script="$(wslpath -w "$windows_checkout/pipeline/deploy_local.ps1")"
           workspace="$(wslpath -w "$windows_checkout")"
           runtime="$(wslpath -w "$(realpath "$DDM501_RUNTIME_ROOT")")"
+          result=0
           powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass \
-            -File "$script" -Workspace "$workspace" -RuntimeRoot "$runtime" -Revision "$GITHUB_SHA"
-          mkdir -p "$GITHUB_WORKSPACE/reports"
-          cp "$windows_checkout/reports/deployment-monitoring-verification.json" \
-            "$GITHUB_WORKSPACE/reports/deployment-monitoring-verification.json"
+            -File "$script" -Workspace "$workspace" -RuntimeRoot "$runtime" -Revision "$GITHUB_SHA" || result=$?
+          if test -f "$windows_checkout/reports/deployment-monitoring-verification.json"; then
+            mkdir -p "$GITHUB_WORKSPACE/reports"
+            cp "$windows_checkout/reports/deployment-monitoring-verification.json" \
+              "$GITHUB_WORKSPACE/reports/deployment-monitoring-verification.json"
+          fi
+          exit "$result"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
