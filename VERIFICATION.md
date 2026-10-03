@@ -1,5 +1,21 @@
 # Kiểm chứng MLOps và company service (Asia/Saigon)
 
+## Deploy GitHub Actions 02/10/2026, đối chiếu ngày 03/10/2026
+
+- Repository hiện dùng để đối chiếu CI/deploy: [FSB-MSA36HN/DDM501-face-voice-proctoring](https://github.com/FSB-MSA36HN/DDM501-face-voice-proctoring). Các link repo cá nhân ở những mục baseline bên dưới là bằng chứng lịch sử.
+- [Run 37032729559](https://github.com/FSB-MSA36HN/DDM501-face-voice-proctoring/actions/runs/37032729559), commit `dfd1faa460cc9cb153bcf059cbe2d9fc3ecdcd42`, **success**. GitHub API xác nhận cả `quality`, `containers`, `deploy-demo` thành công; [job deploy-demo](https://github.com/FSB-MSA36HN/DDM501-face-voice-proctoring/actions/runs/37032729559/job/110924788849) hoàn tất lúc **23:21:33 ngày 02/10/2026** (Asia/Saigon).
+- Deployment chạy qua runner **self-hosted Linux/WSL** và gọi PowerShell trên Windows để stage đúng SHA ngoài OneDrive, Compose rollout, chờ readiness rồi kiểm chứng monitoring. Đây là bằng chứng deploy tự động đã vượt trở ngại runner Windows ghi trong mục 01/10; không phải deploy cloud.
+- Đã tải và đọc artifact `deployment-monitoring-evidence`: report lúc `2026-10-02T16:21:19.252512+00:00`, `status=pass`; cả `all_dashboard_queries`, `collector_and_container_freshness`, `protected_reports_and_sources` đều pass. Bản đối chiếu local: `reports/prior-deployment-monitoring-verification.json` (gitignored).
+- Đã đọc JUnit/coverage trong artifact `quality-evidence`: **103 test được thu thập = 101 passed + 2 skipped**, không failure/error; coverage **81,02%**. Hai test bị skip là `test_deployment_preflight_stages_exact_checkout` và `test_deployment_rejects_other_revision_before_staging`. Vì vậy job quality xanh của run này **không chứng minh hai test preflight đã chạy**; bằng chứng triển khai thật là job `deploy-demo` và artifact monitoring riêng.
+
+## Sửa kiểm chứng ngày 03/10/2026
+
+- `verify_stack.py` kiểm tra tập tên đầy đủ của 7 task training (gồm `publish_versioned_dataset`), không cho phép task trùng/thiếu/lạ và yêu cầu mọi task `success`. Test hồi quy tái hiện verifier cũ từ chối 7 task hợp lệ nhưng chấp nhận 6 task thiếu; sau sửa, cả 9 tình huống pass, gồm empty/failed/running/skipped/state chưa có.
+- Chạy thật `python pipeline/verify_stack.py --dag-run continuous_training_20261002_b`: **7/7 nhóm kiểm chứng pass**, trong đó Airflow có **7/7 task success**. Report: `reports/verification.json`. Lần kiểm tra này đọc lại training run đã có; không trigger training, không gửi inference hoặc Telegram mới.
+- Hai test deployment nay dùng checkout Git, `.env` mẫu, Python runtime và release directory tạm; không phụ thuộc `DDM501_RUNTIME_ROOT` hay dữ liệu demo. Trên Windows local, **2 passed, 0 skipped**; kiểm tra staging từ đúng commit dù working tree đã sửa, từ chối SHA khác trước staging và giữ nguyên `.env` runtime.
+- Workflow thêm job bắt buộc `deployment-preflight` trên `windows-latest`, upload `deployment-preflight-evidence` và fail nếu JUnit thiếu test, có skip/failure/error. `containers` phụ thuộc cả `quality` và `deployment-preflight`; Ubuntu vẫn skip hai test Windows một cách minh bạch. Cấu hình mới chưa được chạy trên GitHub trong phiên sửa này; không gán kết quả run cũ cho workflow mới.
+- Bộ test local theo scope coverage CI: **112 passed, 0 skipped**, coverage **81,06%** (ngưỡng 80%); JUnit `reports/tests-review.xml`, `coverage.xml`. Có 13 warning từ dependencies, không có test failure/error. Ruff, compile và kiểm tra cấu hình Compose pass.
+
 ## Continuous MLOps local 02/10/2026
 
 - Checkpoint trước thay đổi: branch `checkpoint/2026-10-02-before-mlops-continuous`, commit `4913b7b`; dump PostgreSQL `data/backups/ddm501_restore_drill_20261001_184709.dump` đã được restore thử vào database tạm. Runtime MinIO/DB phát sinh sau checkpoint cần sao lưu riêng nếu rollback.
@@ -88,7 +104,7 @@ Truy vấn không lỗi không đồng nghĩa mọi series có dữ liệu: huma
 - Portable serving image đã kiểm chứng local không có bind mount model, 19 integration checks pass, dùng chung local DB/MLflow/MinIO. Private overlay đã validate config. Chưa phải deployment cloud/customer thực tế.
 - Load smoke trước đó: 20 requests, concurrency 2, 0 lỗi, p95 0,244s trên CPU warm; không suy ra SLA hoặc capacity production.
 
-## CI/CD thực tế
+## CI/CD baseline 28/09/2026
 
 Run [36430718832](https://github.com/TrinhDucDuong/ddm501-face-voice-proctoring/actions/runs/36430718832) **success**, commit `3e98c770c913b84f30e68e541d044551f966503c`, ngày 28/09/2026. Cả ba jobs **quality, containers, deploy-demo** thành công, gồm kiểm chứng dashboard/protected reports/freshness và upload artifacts. Remote: **52 passed, coverage 88,69%**; local: **52 passed, coverage 88,76%**. Deploy thực tế trên Docker Desktop qua runner Windows, source release ngoài OneDrive, dữ liệu/secrets giữ nguyên; chưa phải public cloud deployment.
 

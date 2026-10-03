@@ -11,6 +11,16 @@ from pathlib import Path
 import requests
 from dotenv import dotenv_values
 
+EXPECTED_MODEL_TASK_IDS = {
+    "ingest_versioned_snapshot",
+    "validate_data_quality",
+    "publish_versioned_dataset",
+    "feature_engineer_train_register_candidate",
+    "generate_responsible_ai_audit",
+    "evaluate_and_promote_candidate",
+    "reload_current_champion",
+}
+
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -70,7 +80,9 @@ def main() -> None:
             "states-for-dag-run", "biometric_model_pipeline", args.dag_run, "-o", "json",
         ], capture_output=True, text=True, check=True, encoding="utf-8")
         tasks = json.loads(result.stdout)
-        assert len(tasks) == 6 and all(task["state"] == "success" for task in tasks), tasks
+        task_ids = [task["task_id"] for task in tasks]
+        assert set(task_ids) == EXPECTED_MODEL_TASK_IDS and len(task_ids) == len(set(task_ids)), tasks
+        assert all(task["state"] == "success" for task in tasks), tasks
         return tasks
 
     def targets():

@@ -32,6 +32,8 @@ python pipeline/verify_company_service.py
 python pipeline/verify_monitoring_centre.py
 ```
 
+CI tách `quality` (Ubuntu, unit tests/coverage) và `deployment-preflight` (Windows, hai test staging/reject SHA với runtime tạm, không cần secrets hoặc Docker daemon). Job Windows phải có JUnit không skip; `containers` chờ cả hai job trước khi `deploy-demo` được phép chạy. Preflight không thay thế kiểm chứng deploy thật qua WSL runner và Docker Desktop; xem [bằng chứng CI/deploy ngày 02/10](VERIFICATION.md#deploy-github-actions-02102026-đối-chiếu-ngày-03102026).
+
 [Report](PROJECT_REPORT.md) · [Sơ đồ kiến trúc Mermaid](docs/ARCHITECTURE_OVERVIEW.md) · [Continuous MLOps](docs/CONTINUOUS_MLOPS.md) · [Demo và bàn giao](docs/DEMO_HANDOVER_GUIDE.md) · [Scope](PROJECT_REQUIREMENTS.md) · [Kiến trúc kỹ thuật](ARCHITECTURE.md) · [Tích hợp](SAAS_INTEGRATION.md) · [Mapping](RUBRIC_MAPPING.md) · [Bằng chứng](VERIFICATION.md) · [Vận hành](OPERATIONS.md).
 
-GitHub https://github.com/TrinhDucDuong/ddm501-face-voice-proctoring. Demo Grafana/Airflow admin/admin, loopback only. Không commit credentials, biometric media hoặc backups.
+GitHub https://github.com/FSB-MSA36HN/DDM501-face-voice-proctoring. Demo Grafana/Airflow admin/admin, loopback only. Không commit credentials, biometric media hoặc backups.
