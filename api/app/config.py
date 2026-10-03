@@ -41,6 +41,8 @@ class Settings(BaseSettings):
     monitoring_embedding_retention_days: int = 30
     lifecycle_config_path: str = './pipeline/lifecycle_config.json'
     continuous_training_enabled: bool = True
+    simulation_service_url: str = ''
+    simulation_service_key: str = ''
 
 
 @lru_cache

@@ -85,6 +85,7 @@ services:
     restart: "no"
 
   api:
+    networks: [default, simulation-lab]
     build:
       context: .
       dockerfile: api/Dockerfile
@@ -100,6 +101,8 @@ services:
       ENABLE_SIMULATION: ${ENABLE_SIMULATION:-true}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:18100}
       WEBHOOK_ALLOWED_HOSTS: ${WEBHOOK_ALLOWED_HOSTS:-legacy-demo,localhost,127.0.0.1}
+      SIMULATION_SERVICE_URL: http://simulation:8000
+      SIMULATION_SERVICE_KEY: ${SIMULATION_SERVICE_KEY:-local-synthetic-demo}
     volumes: ["${MODELS_PATH:-./models}:/models", "${REPORTS_PATH:-./reports}:/reports:ro"]
     ports: ["127.0.0.1:18100:8000"]
     healthcheck:
@@ -124,6 +127,36 @@ services:
       interval: 15s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
+
+  simulation:
+    networks: [simulation-lab]
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+      args: {INSTALL_PRETRAINED: "false"}
+    command: uvicorn app.simulation_server:application --factory --host 0.0.0.0 --port 8000 --workers 1
+    environment:
+      SIMULATION_ROOT: /srv/data/simulation
+      SIMULATION_KEY: ${SIMULATION_SERVICE_KEY:-local-synthetic-demo}
+      DATABASE_URL: sqlite:////srv/data/simulation/unused.sqlite
+      MLFLOW_TRACKING_URI: file:///srv/data/simulation/mlruns
+    volumes: ["simulation-data:/srv/data/simulation"]
+    cpus: 1.0
+    mem_limit: 1536m
+    restart: unless-stopped
+
+  simulation-mlflow:
+    networks: [simulation-lab, simulation-ui]
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+      args: {INSTALL_PRETRAINED: "false"}
+    command: mlflow server --host 0.0.0.0 --port 8000 --workers 1 --backend-store-uri file:///srv/data/simulation/mlruns
+    volumes: ["simulation-data:/srv/data/simulation"]
+    ports: ["127.0.0.1:15031:8000"]
+    cpus: 0.5
+    mem_limit: 768m
     restart: unless-stopped
 
   webhook-worker:
@@ -189,6 +222,8 @@ services:
       MINIO_ENDPOINT: http://minio:9000
       TRAINING_TENANT_ID: ${TRAINING_TENANT_ID:-demo}
       CONTINUOUS_TRAINING_ENABLED: ${CONTINUOUS_TRAINING_ENABLED:-true}
+      SIMULATION_SERVICE_URL: http://simulation:8000
+      SIMULATION_KEY: ${SIMULATION_SERVICE_KEY:-local-synthetic-demo}
     volumes: &airflow-volumes
       - ./airflow/dags:/opt/airflow/dags:ro
       - ${AIRFLOW_LOGS_PATH:-./airflow/logs}:/opt/airflow/logs
@@ -221,6 +256,7 @@ services:
     restart: unless-stopped
 
   airflow-scheduler:
+    networks: [default, simulation-lab]
     build:
       context: .
       dockerfile: airflow/Dockerfile
@@ -239,6 +275,7 @@ services:
     restart: unless-stopped
 
   prometheus:
+    networks: [default, simulation-lab]
     image: prom/prometheus:v3.4.0
     depends_on: [api, drift-monitor, alertmanager]
     volumes:
@@ -276,6 +313,7 @@ services:
     restart: unless-stopped
 
   alertmanager:
+    networks: [default, simulation-lab]
     image: prom/alertmanager:v0.28.1
     command: ["--config.file=/etc/alertmanager/alertmanager.yml"]
     volumes: ["./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro"]
@@ -378,7 +416,13 @@ services:
     depends_on: [loki, docker-observer]
     restart: unless-stopped
 
+networks:
+  simulation-ui:
+  simulation-lab:
+    internal: true
+
 volumes:
+  simulation-data:
   postgres-data:
   minio-data:
   grafana-data:

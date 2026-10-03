@@ -1,5 +1,6 @@
 """Reuse identity-disjoint calibration for one independent threshold policy."""
 import json
+import math
 import os
 import tempfile
 from pathlib import Path
@@ -12,7 +13,24 @@ from mlflow import MlflowClient
 from mlflow.models import infer_signature
 
 from pipeline.data_snapshot import read_snapshot
+from pipeline.drift_decision import DriftConfig, performance
 from pipeline.evaluation import identity_evaluation, policy_scores
+
+
+def paired_gate(positive, negative, champion_threshold, candidate_threshold, metrics, limits):
+    evidence = [{'score': float(value), 'threshold': champion_threshold, 'truth': truth, 'random_audit': True}
+                for truth, values in [(True, positive), (False, negative)] for value in values]
+    config = DriftConfig(min_labels_per_class=limits.min_labels_per_class, target_far=limits.max_fmr)
+    incumbent = performance(evidence, config)
+    candidate = performance([{**r, 'threshold': candidate_threshold} for r in evidence], config)
+    passed = incumbent['status'] == candidate['status'] == 'READY'
+    for metric, limit, regression in [('fmr', limits.max_fmr, limits.max_security_regression),
+                                    ('fnmr', limits.max_fnmr, limits.max_fnmr_regression)]:
+        passed = passed and candidate[metric] <= min(limit, incumbent[metric] + regression)
+    for key in ('far', 'frr', 'cv_far', 'cv_frr', 'holdout_far', 'holdout_frr'):
+        value = metrics.get(key, float('nan'))
+        passed = passed and math.isfinite(value) and 0 <= value <= (limits.max_fmr if 'far' in key else limits.max_fnmr)
+    return {'passed': bool(passed), 'champion': incumbent, 'candidate': candidate}
 
 
 class ThresholdPolicy(mlflow.pyfunc.PythonModel):
@@ -24,10 +42,10 @@ class ThresholdPolicy(mlflow.pyfunc.PythonModel):
         return np.isfinite(scores) & (np.abs(scores) <= 1) & (scores >= self.threshold)
 
 
-def register_policy(modality, threshold, metrics, evidence, provenance):
+def register_policy(modality, threshold, metrics, evidence, provenance, registry_name=None):
     if modality not in ('face', 'voice'):
         raise ValueError('Unknown modality')
-    name = f'{modality}-verification'
+    name = registry_name or f'{modality}-verification'
     client = MlflowClient()
     if provenance.get('training_window'):
         for version in client.search_model_versions(f"name='{name}'"):
@@ -47,6 +65,7 @@ def register_policy(modality, threshold, metrics, evidence, provenance):
         frame = pd.DataFrame({'score': [.1, .9]})
         mlflow.pyfunc.log_model(artifact_path='policy', python_model=ThresholdPolicy(),
             artifacts={'policy': str(path)}, registered_model_name=name,
+            pip_requirements=['mlflow==2.22.0', 'numpy==1.26.4', 'pandas==2.2.3'],
             input_example=frame, signature=infer_signature(frame, np.array([False, True])))
         client = MlflowClient()
         versions = client.search_model_versions(f"name='{name}'")

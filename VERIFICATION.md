@@ -1,5 +1,18 @@
 # Kiểm chứng MLOps và company service (Asia/Saigon)
 
+## Simulation cách ly 03/10/2026
+
+- Trang quản trị **Simulation MLOps** có hai nút kịch bản và một nút khôi phục baseline, chọn Face/Voice, trạng thái trực tiếp và xuất evidence theo lượt. AppTest chạy với API local thật xác nhận render không lỗi và đủ ba nút: `reports/simulation-ui-verification.json`.
+- Deploy local từ working tree tại `C:/Users/tdd23/AppData/Local/DDM501/deployments/local-simulation-20261003-155339`, manifest SHA-256 trong release. Simulation có SQLite/MLflow/volume/network riêng; container không phân giải được hostname PostgreSQL, MinIO và MLflow production. Không dùng dữ liệu sinh trắc thật.
+- Lượt promotion Voice `5d3481a8-540c-41b4-bdf6-9730667292ba`, Airflow `scheduled__2026-10-03T08:57:00+00:00`: thành công. Alert đi qua Prometheus/Alertmanager tới receiver simulation trước training. Trên holdout 30 genuine/45 impostor tổng hợp: FMR 0% ở cả hai policy, FNMR từ 100% xuống 0%. Đây là dữ liệu được xây dựng để minh họa hiệu chỉnh ngưỡng, không phải kết quả biometric benchmark.
+- Traffic thật tới endpoint embedding của simulation: shadow 0/200 request dùng challenger; các stage 5/10/25/50/100% lần lượt có **13/22/57/99/200** request dùng challenger trong 200 request/stage. Sau promotion, 200 probe đều dùng version 2. Dùng chung encoder là giả định của policy; simulation không chạy ảnh/WAV qua encoder.
+- Lượt rollback Face `9dfca837-9647-4c01-8ae2-e6b508aff8e1`, Airflow `scheduled__2026-10-03T08:59:00+00:00`: workflow thành công, kết quả lifecycle `FAILED_CANARY`. Tại 25%, impostor được tiêm có score cao khiến FMR challenger=1.0 vượt gate không hồi quy=0.0. Sau rollback, **200/200** probe dùng version 1, không request nào dùng challenger.
+- Reset sau hai lượt đều pass. Thử reset khi đang PREPARE ở lượt `dad67591-c571-427e-9ca8-df890a0b62f6` cũng pass; Airflow `scheduled__2026-10-03T09:04:00+00:00` bỏ qua drift/train/offline/shadow/canary đúng cơ chế vô hiệu hóa task cũ. Báo cáo `reports/simulation-cancel-verification.json`.
+- Đối chiếu trước/sau: champion, challenger, traffic và trạng thái production Face/Voice không thay đổi. Báo cáo tổng `reports/simulation-verification.json`; dữ liệu chi tiết `reports/simulation-promotion.json`, `reports/simulation-rollback.json`. Baseline demo đã được phục hồi để chạy lại trên lớp.
+- Bộ test cuối: **153 passed, 0 skipped**, coverage scope CI **82,03%**; có kiểm thử reset giữa stage, retry claim, task cũ, quyền operator/integration và UI. Ruff, compile, Compose config và ba nhóm `verify_monitoring_centre.py` pass. JUnit `reports/simulation-tests.xml`.
+- Tại thời điểm kiểm chứng local, simulation chưa commit/push; các kết quả trên là bằng chứng trước lượt push simulation. Riêng lifecycle commit `76169cf` trước đó đã có [GitHub run 37109629250](https://github.com/FSB-MSA36HN/DDM501-face-voice-proctoring/actions/runs/37109629250) kết thúc `success`; không dùng run này làm bằng chứng CI của simulation mới.
+- Hướng dẫn, cấu hình tăng tốc và giới hạn: [SIMULATION.md](docs/SIMULATION.md). Đây là kiểm chứng cơ chế end-to-end trên nhãn giả lập, không chứng minh chất lượng production hoặc khả năng tải 50.000 nhân viên.
+
 ## Kiểm tra trước khi push lifecycle 03/10/2026
 
 - Chạy lại toàn bộ suite trên Windows/Python 3.10.11: **146 passed, 0 skipped**, coverage theo scope CI **82,53%**; gồm hai test deployment preflight Windows và bốn case hồi quy MLflow REST alias. JUnit: `reports/lifecycle-push-tests.xml` (gitignored).

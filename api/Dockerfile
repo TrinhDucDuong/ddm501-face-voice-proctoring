@@ -22,7 +22,7 @@ RUN pip install /wheels/* && rm -rf /wheels \
 COPY api/app ./app
 COPY pipeline ./pipeline
 RUN useradd --create-home --uid 10001 appuser \
-    && mkdir -p /models /srv/data \
+    && mkdir -p /models /srv/data/simulation \
     && chown -R appuser:appuser /srv /models
 USER appuser
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl --fail http://localhost:${PORT:-8000}/health || exit 1

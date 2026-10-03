@@ -67,7 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: cp .env.example .env
-      - run: docker compose build api ui drift-monitor ops-monitor airflow-scheduler webhook-worker legacy-demo
+      - run: docker compose build api ui drift-monitor ops-monitor airflow-scheduler webhook-worker legacy-demo simulation simulation-mlflow
 
   deploy-demo:
     if: >-

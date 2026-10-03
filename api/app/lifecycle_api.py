@@ -11,8 +11,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from pipeline.drift_decision import DriftConfig, performance
-from pipeline.modality_training import register_policy
+from pipeline.drift_decision import performance
+from pipeline.modality_training import paired_gate, register_policy
 
 from .auth import Principal, platform
 from .db import get_db
@@ -227,22 +227,10 @@ def candidate(modality: Modality, body: CandidateRequest, db: Session = Depends(
     path = client.download_artifacts(version.run_id, 'evaluation/paired-scores.json')
     scores = json.loads(Path(path).read_text(encoding='utf-8'))
     _, _, limits, _ = configuration(settings.lifecycle_config_path)
-    evidence = []
-    for truth, values in [(True, scores['positive']), (False, scores['negative'])]:
-        evidence.extend({'score': value, 'threshold': row.champion_threshold,
-                         'truth': truth, 'random_audit': True} for value in values)
-    metric_config = DriftConfig(min_labels_per_class=limits.min_labels_per_class, target_far=limits.max_fmr)
-    incumbent = performance(evidence, metric_config)
-    challenger = performance([{**r, 'threshold': threshold} for r in evidence], metric_config)
-    passed = incumbent['status'] == challenger['status'] == 'READY'
-    for metric, limit, regression in [('fmr', limits.max_fmr, limits.max_security_regression),
-                                      ('fnmr', limits.max_fnmr, limits.max_fnmr_regression)]:
-        passed = passed and challenger[metric] <= min(limit, incumbent[metric] + regression)
-    for key in ('far', 'frr', 'cv_far', 'cv_frr', 'holdout_far', 'holdout_frr'):
-        value = run.data.metrics.get(key, float('nan'))
-        passed = passed and math.isfinite(value) and 0 <= value <= (limits.max_fmr if 'far' in key else limits.max_fnmr)
-    result = {'passed': bool(passed), 'champion': incumbent, 'candidate': challenger,
-              'dataset_version': run.data.params['dataset_version']}
+    result = paired_gate(scores['positive'], scores['negative'], row.champion_threshold,
+                         threshold, run.data.metrics, limits)
+    result['dataset_version'] = run.data.params['dataset_version']
+    passed = result['passed']
     if passed:
         client.set_registered_model_alias(row.registry_name, 'challenger', body.version)
         row.state = 'CHAMPION'

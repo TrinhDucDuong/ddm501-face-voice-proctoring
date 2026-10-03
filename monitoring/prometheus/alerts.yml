@@ -96,6 +96,11 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "Batch monitoring DAG has not produced fresh evidence for two hours"
+      - alert: SimulationRetrainRequired
+        expr: simulation_retrain_required == 1
+        labels: {severity: info, synthetic: "true"}
+        annotations:
+          summary: "Synthetic classroom drift requested threshold retraining"
       - alert: BiometricHighReviewRate
         expr: sum(rate(biometric_verifications_total{decision="review"}[10m])) / clamp_min(sum(rate(biometric_verifications_total[10m])), 0.001) > 0.35
         for: 5m

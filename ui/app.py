@@ -112,7 +112,7 @@ try:
         st.session_state['enrollment_link_tenant'] = identity['tenant_id']
     platform = identity['role'] == 'platform'
     operator = identity['role'] in {'operator', 'platform'}
-    pages = ['Công ty & đăng ký', 'Vận hành MLOps'] if platform else ['Tổng quan', 'Nhân viên', 'Kiểm tra tích hợp', 'Lịch sử & báo cáo']
+    pages = ['Công ty & đăng ký', 'Vận hành MLOps', 'Simulation MLOps'] if platform else ['Tổng quan', 'Nhân viên', 'Kiểm tra tích hợp', 'Lịch sử & báo cáo']
     if operator and not platform:
         pages += ['Ghi danh face & voice', 'API & Webhook']
     st.sidebar.caption('Quản trị nền tảng' if platform else 'Dữ liệu của công ty bạn')
@@ -317,6 +317,10 @@ try:
         if st.button('Cập nhật đăng ký'):
             api('PATCH', f"/v1/admin/tenants/{tenant['id']}/subscription", json={'active': active})
             st.success('Đã cập nhật; dữ liệu lịch sử được giữ nguyên.')
+
+    elif page == 'Simulation MLOps':
+        from ui.simulation import render
+        render(api)
 
     elif page == 'Vận hành MLOps':
         st.link_button('Grafana Monitoring Centre', 'http://localhost:13000/d/biometric-overview', type='primary')

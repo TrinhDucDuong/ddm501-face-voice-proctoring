@@ -4,7 +4,18 @@ route:
   group_wait: 10s
   group_interval: 1m
   repeat_interval: 4h
+  routes:
+    - matchers: ['synthetic="true"', 'alertname="SimulationRetrainRequired"']
+      receiver: simulation-only
+      group_by: [alertname, run_id]
+      group_wait: 0s
+      group_interval: 10s
+      repeat_interval: 1h
 receivers:
+  - name: simulation-only
+    webhook_configs:
+      - url: http://simulation:8000/alerts
+        send_resolved: true
   - name: project-notifications
     webhook_configs:
       - url: http://ops-monitor:8003/alerts

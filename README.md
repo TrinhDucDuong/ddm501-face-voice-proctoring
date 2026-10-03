@@ -16,11 +16,13 @@ Grafana http://localhost:13000/d/biometric-overview; Airflow http://localhost:18
 
 ## Model và dữ liệu
 
+Quản trị nền tảng có trang **Simulation MLOps** với ba nút: drift dẫn tới promotion, canary lỗi dẫn tới rollback, và khôi phục baseline demo. Simulation dùng network/database/MLflow riêng, dữ liệu và nhãn tổng hợp; xem [hướng dẫn và giới hạn](docs/SIMULATION.md). MLflow simulation: http://localhost:15031.
+
 SFace/YuNet + ECAPA xác minh danh tính. MiniFASNet face PAD và AASIST audio anti-spoof là detector nghiên cứu pretrained/pinned. ECAPA segments là heuristic thay người nói. Missing detector trả inconclusive. Chưa có benchmark khách hàng cho mọi deepfake, physical replay hoặc simultaneous voices.
 
 PostgreSQL lưu embedding/metadata/checks/review; MinIO lưu suspicious evidence, MLflow artifacts và các snapshot feature/nhãn có phiên bản cho MLOps. Raw enrollment và media check hợp lệ không được giữ mặc định. Lịch sử, exports và evidence downloads đều tenant-scoped. Webhook HMAC có durable outbox/retry; receiver phải deduplicate.
 
-Airflow có hai DAG: monitoring mỗi giờ và hiệu chỉnh ngưỡng theo yêu cầu riêng Face/Voice. Source hiện có decision engine nhiều tầng, template có phiên bản và luồng `candidate → offline → challenger → shadow → canary → champion/rollback`; drift thống kê đơn lẻ không kích hoạt train. Xem [lifecycle và giới hạn thực tế](docs/MODALITY_LIFECYCLE.md), [Continuous MLOps](docs/CONTINUOUS_MLOPS.md) và [bằng chứng theo từng phiên bản](VERIFICATION.md). Phần nâng cấp lifecycle mới đã deploy local bằng Docker Compose ngày 03/10/2026, API và monitoring DAG hoạt động; chưa có bằng chứng GitHub CI/deploy cho source mới hoặc rollout production đầy đủ.
+Airflow có hai DAG phục vụ lifecycle chính: monitoring mỗi giờ và hiệu chỉnh ngưỡng theo yêu cầu riêng Face/Voice; DAG `biometric_simulation` riêng nhận job demo. Source hiện có decision engine nhiều tầng, template có phiên bản và luồng `candidate → offline → challenger → shadow → canary → champion/rollback`; drift thống kê đơn lẻ không kích hoạt train. Xem [lifecycle và giới hạn thực tế](docs/MODALITY_LIFECYCLE.md), [Continuous MLOps](docs/CONTINUOUS_MLOPS.md) và [bằng chứng theo từng phiên bản](VERIFICATION.md). Lifecycle commit `76169cf` đã có GitHub CI/deploy thành công; phần simulation mới được kiểm chứng local, không phải bằng chứng rollout bằng dữ liệu production.
 
 ## Chạy và kiểm chứng
 

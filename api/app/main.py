@@ -450,6 +450,7 @@ from .company_reports import router as reports_router  # noqa: E402
 from .integrity import IntegrityInspector  # noqa: E402
 from .lifecycle_api import router as lifecycle_router  # noqa: E402
 from .saas import router as saas_router  # noqa: E402
+from .simulation_api import router as simulation_router  # noqa: E402
 
 app.state.perform_verification = perform_verification
 integrity_inspector = IntegrityInspector(settings, biometrics)
@@ -459,6 +460,7 @@ app.include_router(checks_router)
 app.include_router(company_router)
 app.include_router(reports_router)
 app.include_router(lifecycle_router)
+app.include_router(simulation_router)
 
 
 @app.exception_handler(Exception)
