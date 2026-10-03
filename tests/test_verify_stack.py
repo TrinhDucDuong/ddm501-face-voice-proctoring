@@ -19,6 +19,15 @@ TASK_IDS = [
 ]
 
 
+def test_inference_version_validation_accepts_only_routed_canary_versions():
+    health = {'model_version': 'face:1|voice:3', 'modality_champions': {'face': '1', 'voice': '3'}}
+    states = [{'modality': 'face', 'state': 'CANARY', 'champion_version': '1', 'challenger_version': '2'},
+              {'modality': 'voice', 'state': 'SHADOW', 'champion_version': '3', 'challenger_version': '4'}]
+    verify_stack.validate_served_versions({'model_versions': {'face': '2', 'voice': '3'}}, health, states)
+    with pytest.raises(AssertionError):
+        verify_stack.validate_served_versions({'model_versions': {'face': '2', 'voice': '4'}}, health, states)
+
+
 @pytest.mark.parametrize('scenario, expected_status', [
     ('complete', 'pass'),
     ('missing', 'fail'),

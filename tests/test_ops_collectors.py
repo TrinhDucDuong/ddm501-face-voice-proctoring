@@ -159,3 +159,29 @@ def test_docker_metrics_filter_project_and_reset_removed_containers(monkeypatch)
     assert ops.CONTAINER_NETWORK.labels(**labels,direction='tx')._value.get() == 20
     ops.collect_containers()
     assert not list(ops.CONTAINER_CPU.collect()[0].samples)
+
+
+def test_modality_metrics_remain_aggregate_and_missing_labels_stay_unknown(monkeypatch, tmp_path):
+    import math
+
+    path = tmp_path / 'monitor.json'
+    path.write_text(json.dumps({'calculated_at': datetime.now(timezone.utc).isoformat(), 'tenants': [],
+        'modalities': [{'modality': 'voice', 'decision': 'INSUFFICIENT_DATA', 'trigger_training': False,
+                        'quality': {'score': .4}, 'embedding': {'score': .03},
+                        'performance': {'status': 'INSUFFICIENT_LABELS'},
+                        'verification_score': {'genuine': {'current': {'count': 3, 'mean': .8}}},
+                        'template_aging': {'detected': False}}]}))
+    monkeypatch.setenv('MONITORING_SUMMARY_PATH', str(path))
+    ops.collect_monitoring()
+    assert math.isnan(ops.MODALITY_PERFORMANCE.labels('voice', 'fmr')._value.get())
+    assert ops.MODALITY_DRIFT.labels('voice', 'embedding')._value.get() == .03
+    assert ops.MODALITY_SCORE.labels('voice', 'genuine')._value.get() == pytest.approx(.8)
+    for metric in (ops.MODALITY_DRIFT, ops.MODALITY_PERFORMANCE, ops.MODALITY_STATE):
+        for family in metric.collect():
+            for sample in family.samples:
+                assert not {'person_id', 'employee_id', 'embedding'} & set(sample.labels)
+    monkeypatch.setenv('API_KEY', 'test')
+    monkeypatch.setattr(ops.requests, 'get', lambda *a, **k: response([
+        {'modality': 'face', 'state': 'FAILED_CANARY', 'traffic_percent': 0, 'samples': 100, 'rollback_count': 1}]))
+    ops.collect_lifecycle()
+    assert ops.ROLLBACK_COUNT.labels('face')._value.get() == 1

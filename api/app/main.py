@@ -13,6 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from . import observation
 from .auth import Principal, audit, authenticate, digest, get_person, operator, platform
 from .biometrics import BiometricEngine, BiometricError, cosine
 from .config import get_settings
@@ -26,6 +27,7 @@ from .models import (
     CheckReview,
     EnrollmentInvitation,
     IntegrityCheck,
+    ModalityDeployment,
     Person,
     Tenant,
     VerificationEvent,
@@ -42,6 +44,7 @@ from .schemas import (
     VerificationOut,
 )
 from .storage import ObjectStore, sha256
+from .template_lifecycle import append_enrollment
 
 settings = get_settings()
 biometrics = BiometricEngine(settings)
@@ -105,18 +108,20 @@ def person_out(person: Person) -> PersonOut:
 @app.get("/health")
 def health(db: Session = Depends(get_db)) -> dict:
     db.execute(select(1))
+    champions = {row.modality: row.champion_version for row in db.scalars(select(ModalityDeployment))}
     return {
         "status": "healthy",
         "backend": settings.model_backend,
-        "model_version": registry.current.version,
+        "model_version": '|'.join(f'{m}:{champions[m]}' for m in sorted(champions)) if champions else registry.current.version,
         "raw_storage": settings.store_raw_biometrics,
+        "modality_champions": champions,
     }
 
 
 @app.get("/ready")
 def ready(db: Session = Depends(get_db)) -> dict:
     result = health(db)
-    if registry.current.version == "local-default":
+    if registry.current.version == "local-default" and set(result['modality_champions']) != {'face', 'voice'}:
         raise HTTPException(503, "No registered champion loaded yet")
     return result
 
@@ -176,6 +181,7 @@ async def enroll(
                 extension = "jpg" if modality == "face" else "wav"
                 key = object_store.put(person_id, modality, payload, extension)
                 db.add(BiometricSample(person_id=person_id, modality=modality, embedding=result.embedding.tolist(), quality=result.quality, object_key=key, sha256=digest))
+                append_enrollment(db, person_id, modality, result.embedding.tolist(), result.backend)
                 if modality == "face":
                     face_added += 1
                 else:
@@ -260,6 +266,7 @@ async def enroll_employee(
             db.add(BiometricSample(person_id=person.id, modality=modality,
                                    embedding=result.embedding.tolist(), quality=result.quality,
                                    object_key=object_key, sha256=media_hash))
+            append_enrollment(db, person.id, modality, result.embedding.tolist(), result.backend)
         audit(db, Principal(person.tenant_id, "employee", row.id), "person.self_enrolled", person.id)
         db.commit()
     except Exception:
@@ -276,9 +283,9 @@ async def perform_verification(
 ) -> VerificationOut:
     started = time.perf_counter()
     person = get_person(db, person_id, principal)
-    enrolled = {"face": [], "voice": []}
-    for sample in person.samples:
-        enrolled[sample.modality].append(sample.embedding)
+    template_sets = {m: observation.templates(db, person, m) for m in ('face', 'voice')}
+    enrolled = {m: value[0] for m, value in template_sets.items()}
+    extracted = {}
     reasons: list[str] = []
     scores: dict[str, float | None] = {"face": None, "voice": None}
     qualities: dict[str, float | None] = {"face": None, "voice": None}
@@ -302,7 +309,15 @@ async def perform_verification(
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         scores[modality] = max(cosine(result.embedding, reference) for reference in enrolled[modality])
         qualities[modality] = result.quality
+        extracted[modality] = (result, sha256(payload))
     thresholds = {"face": registry.current.face_threshold, "voice": registry.current.voice_threshold}
+    policies = {m: observation.policy(db, m, f'{person.tenant_id}/{person_id}/{session_id}',
+                                      thresholds[m], registry.current.version, scores[m])
+                for m in extracted}
+    thresholds.update({m: value['threshold'] for m, value in policies.items()})
+    versions = {m: value['version'] for m, value in policies.items()}
+    serving_version = ('|'.join(f'{m}:{versions[m]}' for m in sorted(versions))
+                       if any(value.get('deployment_id') for value in policies.values()) else registry.current.version)
     policy_accepted, risk, policy_reasons = decide(scores, qualities, thresholds, settings.require_both_modalities)
     reasons.extend(policy_reasons)
     accepted = policy_accepted and not reasons
@@ -310,11 +325,14 @@ async def perform_verification(
     event = VerificationEvent(
         person_id=person_id, session_id=session_id, accepted=accepted, risk_score=risk,
         face_score=scores["face"], voice_score=scores["voice"], face_quality=qualities["face"],
-        voice_quality=qualities["voice"], reasons=reasons, model_version=registry.current.version, latency_ms=latency_ms,
+        voice_quality=qualities["voice"], reasons=reasons, model_version=serving_version, latency_ms=latency_ms,
     )
     db.add(event)
     db.flush()
     db.refresh(event)
+    for modality, (result, media_hash) in extracted.items():
+        observation.record(db, event, person, modality, result, scores[modality], media_hash,
+                           template_sets[modality], policies[modality], settings.retain_monitoring_embeddings)
     decision = "allow" if accepted else "review"
     VERIFY.labels(decision=decision).inc()
     LATENCY.observe(latency_ms / 1000)
@@ -322,7 +340,7 @@ async def perform_verification(
         event_id=event.id, person_id=person_id, session_id=session_id, accepted=accepted, decision=decision,
         risk_score=round(risk, 4), face_score=scores["face"], voice_score=scores["voice"],
         face_quality=qualities["face"], voice_quality=qualities["voice"], thresholds=thresholds,
-        reasons=reasons, model_version=registry.current.version, latency_ms=latency_ms,
+        reasons=reasons, model_version=serving_version, model_versions=versions, latency_ms=latency_ms,
         explanations=explain(scores, qualities, thresholds, settings.require_both_modalities),
     )
 
@@ -430,6 +448,7 @@ from .checks import router as checks_router  # noqa: E402
 from .company import router as company_router  # noqa: E402
 from .company_reports import router as reports_router  # noqa: E402
 from .integrity import IntegrityInspector  # noqa: E402
+from .lifecycle_api import router as lifecycle_router  # noqa: E402
 from .saas import router as saas_router  # noqa: E402
 
 app.state.perform_verification = perform_verification
@@ -439,9 +458,18 @@ app.include_router(saas_router)
 app.include_router(checks_router)
 app.include_router(company_router)
 app.include_router(reports_router)
+app.include_router(lifecycle_router)
 
 
 @app.exception_handler(Exception)
-async def unhandled_exception(_, exc: Exception):
+async def unhandled_exception(request, exc: Exception):
     REQUESTS.labels(route="unhandled", status="500").inc()
+    if request.url.path in {'/v1/verify', '/v1/checks'}:
+        from .model_lifecycle import stop_active_rollouts
+        try:
+            with Session(engine) as lifecycle_db:
+                stop_active_rollouts(lifecycle_db, type(exc).__name__)
+                lifecycle_db.commit()
+        except Exception:
+            logging.getLogger(__name__).error('Cannot persist emergency model rollback')
     return JSONResponse(status_code=500, content={"detail": "Lỗi nội bộ", "type": type(exc).__name__})

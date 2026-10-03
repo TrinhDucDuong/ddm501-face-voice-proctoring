@@ -22,6 +22,19 @@ EXPECTED_MODEL_TASK_IDS = {
 }
 
 
+def validate_served_versions(result, health, deployments):
+    if not health.get('modality_champions'):
+        assert result['model_version'] == health['model_version']
+        return
+    assert set(result.get('model_versions', {})) == {'face', 'voice'}, result
+    for modality, version in result['model_versions'].items():
+        state = next(row for row in deployments if row['modality'] == modality)
+        allowed = {state['champion_version']}
+        if state['state'] == 'CANARY':
+            allowed.add(state['challenger_version'])
+        assert version in allowed, result
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dag-run", required=True)
@@ -56,6 +69,19 @@ def main() -> None:
         return health
 
     def registry():
+        champions = get(api + '/health').get('modality_champions', {})
+        if champions:
+            evidence = {}
+            for modality, served in champions.items():
+                version = get(mlflow + '/api/2.0/mlflow/registered-models/alias', params={
+                    'name': modality + '-verification', 'alias': 'champion'})['model_version']
+                assert str(version['version']) == served, version
+                run = get(mlflow + '/api/2.0/mlflow/runs/get', params={'run_id': version['run_id']})['run']
+                params = {p['key']: p['value'] for p in run['data']['params']}
+                assert params['modality'] == modality and -1 <= float(params['threshold']) <= 1
+                assert 'dataset_version' in params or 'migration_from' in params
+                evidence[modality] = {'version': served, 'run_id': version['run_id'], 'params': params}
+            return evidence
         model = get(mlflow + "/api/2.0/mlflow/registered-models/alias", params={
             "name": "face-voice-risk-bundle", "alias": "champion",
         })["model_version"]
@@ -140,7 +166,9 @@ def main() -> None:
                                           "session_id": "e2e-" + label})
             response.raise_for_status()
             result = response.json()
-            assert result["model_version"] == get(api + "/health")["model_version"]
+            current_health = get(api + '/health')
+            deployments = get(api + '/v1/admin/lifecycle/state', headers=headers) if current_health.get('modality_champions') else []
+            validate_served_versions(result, current_health, deployments)
             assert result["accepted"] == (label == "same_identity"), result
             results[label] = {key: result[key] for key in (
                 "event_id", "decision", "face_score", "voice_score", "model_version", "latency_ms", "reasons",

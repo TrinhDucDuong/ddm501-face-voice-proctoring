@@ -1,0 +1,43 @@
+{
+  "drift": {
+    "min_samples": 100,
+    "min_labels_per_class": 20,
+    "min_consecutive_windows": 3,
+    "psi_threshold": 0.2,
+    "embedding_threshold": 0.02,
+    "embedding_max_samples": 512,
+    "min_cohort_overlap": 0.8,
+    "max_fmr": 0.01,
+    "max_fnmr": 0.05,
+    "degradation_absolute": 0.02,
+    "degradation_relative": 0.25,
+    "target_far": 0.01,
+    "age_boundaries": [30, 90, 180, 365]
+  },
+  "rollout": {
+    "stages": [5, 10, 25, 50, 100],
+    "min_samples": 1000,
+    "min_seconds": 3600,
+    "min_labels_per_class": 30,
+    "max_fmr": 0.01,
+    "max_fnmr": 0.05,
+    "max_security_regression": 0.0,
+    "max_fnmr_regression": 0.005,
+    "max_policy_latency_ms": 10.0,
+    "max_disagreement": 0.1,
+    "minimum_cohort_samples": 20
+  },
+  "template": {
+    "min_observations": 10,
+    "min_holdout_per_class": 20,
+    "min_quality": 0.7,
+    "min_margin": 0.1,
+    "min_consistency": 0.85,
+    "max_fmr": 0.01,
+    "max_templates": 8
+  },
+  "cooldown_hours": 24,
+  "minimum_new_reviewed_samples": 40,
+  "max_observations_per_rollout": 10000,
+  "observation_retention_days": 90
+}

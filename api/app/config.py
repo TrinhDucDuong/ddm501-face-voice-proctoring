@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     face_spoof_threshold: float = 0.5
     audio_spoof_threshold: float = 0.5
     speaker_change_threshold: float = 0.35
+    retain_monitoring_embeddings: bool = False
+    monitoring_embedding_retention_days: int = 30
+    lifecycle_config_path: str = './pipeline/lifecycle_config.json'
+    continuous_training_enabled: bool = True
 
 
 @lru_cache

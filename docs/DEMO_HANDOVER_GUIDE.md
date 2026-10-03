@@ -140,7 +140,7 @@ Trong API docs, chỉ ra `POST /v1/checks` nhận `person_id`, `session_id`, `re
 
 ### 6.1 Airflow — `http://localhost:18081`
 
-Mở DAG **`biometric_model_pipeline`**, chọn run mới nhất; run `employee_demo_20261001` là mốc kiểm chứng đã ghi trong `VERIFICATION.md`. **Graph** cho thứ tự, **Grid** cho trạng thái từng run, **Task Instance/Logs** cho lỗi và đầu ra. DAG chạy theo lịch `0 2 * * 0` (02:00 Chủ nhật theo timezone Airflow), có thể trigger thủ công; `max_active_runs=1`. Không nhầm một lần run DAG với một phiên thi.
+Mở DAG **`biometric_model_pipeline`**, chọn run mới nhất; run `employee_demo_20261001` là mốc kiểm chứng lịch sử trong `VERIFICATION.md`. **Graph** cho thứ tự, **Grid** cho trạng thái từng run, **Task Instance/Logs** cho lỗi và đầu ra. Source lifecycle mới bỏ lịch train hằng tuần, dùng `max_active_runs=2` để Face/Voice có thể độc lập. Monitoring DAG chỉ trigger với `modality` và `window_id` đã đủ bằng chứng; claim trong DB chặn lifecycle trùng cùng modality. Xem [lifecycle hiện tại](MODALITY_LIFECYCLE.md) và đối chiếu revision đang deploy trước khi demo.
 
 Mở thêm **`biometric_monitoring_pipeline`**: mỗi giờ chốt window theo tenant/model version, giữ reference, tách input không nhãn khỏi nhãn review, tính PSI và đề nghị train khi đủ điều kiện. Task `decide_retraining` chọn trigger training hoặc `no_training_needed`. `insufficient_data` khi mới có vài batch là kết quả đúng, không phải DAG lỗi.
 

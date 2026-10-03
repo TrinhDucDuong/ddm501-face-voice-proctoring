@@ -41,6 +41,16 @@ MONITOR_SAMPLES = Gauge('biometric_monitor_tenant_samples', 'Versioned tenant mo
 RETRAIN_RECOMMENDED = Gauge('biometric_retrain_recommended', 'Monitoring ETL recommends candidate training',
                            ['tenant', 'model_version', 'status'])
 MONITOR_ETL_TIME = Gauge('biometric_monitoring_etl_unixtime', 'Latest batch monitoring ETL timestamp')
+MODALITY_DRIFT = Gauge('biometric_modality_drift_score', 'Maximum drift across tenant windows', ['modality', 'kind'])
+MODALITY_PERFORMANCE = Gauge('biometric_modality_performance', 'Worst measured rate across tenant windows', ['modality', 'metric'])
+MODALITY_STATE = Gauge('biometric_modality_drift_state', 'Number of tenant windows in each decision state', ['modality', 'state'])
+MODALITY_RETRAIN = Gauge('biometric_modality_retrain_required', 'Any eligible retraining request', ['modality'])
+MODALITY_SCORE = Gauge('biometric_modality_verification_score', 'Mean score by trusted class across tenant reports', ['modality', 'class'])
+TEMPLATE_AGING = Gauge('biometric_template_aging', 'Tenant windows with old-template-only degradation', ['modality'])
+DEPLOYMENT_STATE = Gauge('biometric_deployment_state', 'Current persisted rollout state', ['modality', 'state'])
+CANARY_TRAFFIC = Gauge('biometric_canary_traffic_percent', 'Configured candidate traffic', ['modality'])
+SHADOW_SAMPLES = Gauge('biometric_challenger_stage_samples', 'Samples since current stage began', ['modality'])
+ROLLBACK_COUNT = Gauge('biometric_rollbacks_total', 'Persisted rollback audit count', ['modality'])
 DAG_STATE = Gauge('biometric_airflow_latest_run_state', 'Latest DAG run state', ['state'])
 DAG_TIME = Gauge('biometric_airflow_latest_run_unixtime', 'Latest DAG start time')
 MONITOR_DAG_STATE = Gauge('biometric_monitoring_dag_state', 'Latest batch monitoring DAG run state', ['state'])
@@ -80,6 +90,28 @@ def write_report(name, report):
 def collect_monitoring():
     path = Path(os.getenv('MONITORING_SUMMARY_PATH', '/data/monitoring/latest.json'))
     report = json.loads(path.read_text(encoding='utf-8'))
+    MODALITY_DRIFT.clear()
+    MODALITY_PERFORMANCE.clear()
+    MODALITY_STATE.clear()
+    for modality in ('face', 'voice'):
+        rows = [r for r in report.get('modalities', []) if r['modality'] == modality]
+        for state in {r['decision'] for r in rows}:
+            MODALITY_STATE.labels(modality, state).set(sum(r['decision'] == state for r in rows))
+        MODALITY_RETRAIN.labels(modality).set(int(any(r['trigger_training'] for r in rows)))
+        TEMPLATE_AGING.labels(modality).set(sum(bool(r.get('template_aging', {}).get('detected')) for r in rows))
+        for label in ('genuine', 'impostor'):
+            distributions = [r.get('verification_score', {}).get(label, {}).get('current', {}) for r in rows]
+            count = sum(d.get('count', 0) for d in distributions)
+            MODALITY_SCORE.labels(modality, label).set(sum(d.get('mean', 0) * d.get('count', 0)
+                for d in distributions) / count if count else math.nan)
+        for kind in ('quality', 'embedding'):
+            values = [r.get(kind, {}).get('score') for r in rows]
+            MODALITY_DRIFT.labels(modality, kind).set(max((v for v in values if v is not None), default=math.nan))
+        for metric in ('fmr', 'fnmr', 'eer', 'tar_at_far'):
+            values = [r.get('performance', {}).get(metric) for r in rows]
+            valid = [v for v in values if v is not None]
+            value = (min(valid) if metric == 'tar_at_far' else max(valid)) if valid else math.nan
+            MODALITY_PERFORMANCE.labels(modality, metric).set(value)
     MONITOR_PSI.clear()
     MONITOR_SAMPLES.clear()
     RETRAIN_RECOMMENDED.clear()
@@ -95,6 +127,19 @@ def collect_monitoring():
                                    status=row['status']).set(int(row['trigger_training']))
     MONITOR_ETL_TIME.set(datetime.fromisoformat(report['calculated_at']).timestamp())
     return report
+
+
+def collect_lifecycle():
+    response = requests.get(os.getenv('API_URL', 'http://api:8000').rstrip('/') + '/v1/admin/lifecycle/state',
+                            headers={'X-API-Key': os.environ['API_KEY']}, timeout=10)
+    response.raise_for_status()
+    DEPLOYMENT_STATE.clear()
+    for row in response.json():
+        modality = row['modality']
+        DEPLOYMENT_STATE.labels(modality, row['state']).set(1)
+        CANARY_TRAFFIC.labels(modality).set(row['traffic_percent'])
+        SHADOW_SAMPLES.labels(modality).set(row['samples'])
+        ROLLBACK_COUNT.labels(modality).set(row['rollback_count'])
 
 
 def format_alert(alert, monitor_summary=None):
@@ -285,7 +330,7 @@ def run_once():
     for component, function in [('database', collect_database), ('registry', collect_registry),
                                 ('airflow', collect_airflow), ('monitoring_dag', collect_monitoring_dag),
                                 ('docker', collect_containers),
-                                ('monitoring', collect_monitoring)]:
+                                ('monitoring', collect_monitoring), ('lifecycle', collect_lifecycle)]:
         COLLECTION.labels(component=component).set(0)
         try:
             function()

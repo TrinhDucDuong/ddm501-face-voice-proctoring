@@ -124,6 +124,18 @@ def build():
     panel('Logs tập trung — chọn service ở phía trên', '{project=~"$project",service=~"$service"}', 'logs', 'loki', width=24)
     panel('Error / exception logs', '{project=~"$project",service=~"$service"} |~ "(?i)(error|exception|failed)"', 'logs','loki',width=24)
 
+    row('8 - Independent Face / Voice lifecycle')
+    panel('Quality and embedding drift', 'biometric_modality_drift_score')
+    panel('Genuine / impostor scores', 'biometric_modality_verification_score')
+    panel('Template aging windows', 'biometric_template_aging', 'stat')
+    panel('FMR / FNMR / EER / TAR at FAR', 'biometric_modality_performance', unit='percentunit', description='Trusted modality labels only; missing evidence remains NaN.')
+    panel('Drift decisions by modality', 'biometric_modality_drift_state', 'table')
+    panel('Eligible retrain requests', 'biometric_modality_retrain_required', 'stat')
+    panel('Persisted deployment state', 'biometric_deployment_state', 'table')
+    panel('Canary traffic percentage', 'biometric_canary_traffic_percent', 'stat')
+    panel('Current stage samples', 'biometric_challenger_stage_samples', 'stat')
+    panel('Rollback audit count', 'biometric_rollbacks_total', 'stat')
+
     return {'uid':'biometric-overview','title':'DDM501 — Monitoring Centre','schemaVersion':41,'version':2,
             'editable':False,'refresh':'15s','timezone':'browser','time':{'from':'now-6h','to':'now'},
             'tags':['ddm501','monitoring'],'panels':panels,

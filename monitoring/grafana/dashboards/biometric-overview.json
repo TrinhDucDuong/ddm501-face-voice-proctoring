@@ -2639,6 +2639,425 @@
         "enableLogDetails": true,
         "sortOrder": "Descending"
       }
+    },
+    {
+      "type": "row",
+      "id": 69,
+      "title": "8 - Independent Face / Voice lifecycle",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 279,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 70,
+      "type": "timeseries",
+      "title": "Quality and embedding drift",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "biometric_modality_drift_score",
+          "legendFormat": "{{service}}{{task}}{{source}} {{window}} {{metric}} {{modality}} {{alias}}{{state}}{{feature}}{{outcome}}{{container_label_com_docker_compose_service}}"
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 280,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 71,
+      "type": "timeseries",
+      "title": "Genuine / impostor scores",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "biometric_modality_verification_score",
+          "legendFormat": "{{service}}{{task}}{{source}} {{window}} {{metric}} {{modality}} {{alias}}{{state}}{{feature}}{{outcome}}{{container_label_com_docker_compose_service}}"
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 280,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 72,
+      "type": "stat",
+      "title": "Template aging windows",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "biometric_template_aging",
+          "legendFormat": "{{service}}{{task}}{{source}} {{window}} {{metric}} {{modality}} {{alias}}{{state}}{{feature}}{{outcome}}{{container_label_com_docker_compose_service}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 288,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 73,
+      "type": "timeseries",
+      "title": "FMR / FNMR / EER / TAR at FAR",
+      "description": "Trusted modality labels only; missing evidence remains NaN.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "biometric_modality_performance",
+          "legendFormat": "{{service}}{{task}}{{source}} {{window}} {{metric}} {{modality}} {{alias}}{{state}}{{feature}}{{outcome}}{{container_label_com_docker_compose_service}}"
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 288,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 74,
+      "type": "table",
+      "title": "Drift decisions by modality",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "biometric_modality_drift_state",
+          "legendFormat": "{{service}}{{task}}{{source}} {{window}} {{metric}} {{modality}} {{alias}}{{state}}{{feature}}{{outcome}}{{container_label_com_docker_compose_service}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 296,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 75,
+      "type": "stat",
+      "title": "Eligible retrain requests",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "biometric_modality_retrain_required",
+          "legendFormat": "{{service}}{{task}}{{source}} {{window}} {{metric}} {{modality}} {{alias}}{{state}}{{feature}}{{outcome}}{{container_label_com_docker_compose_service}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 296,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 76,
+      "type": "table",
+      "title": "Persisted deployment state",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "biometric_deployment_state",
+          "legendFormat": "{{service}}{{task}}{{source}} {{window}} {{metric}} {{modality}} {{alias}}{{state}}{{feature}}{{outcome}}{{container_label_com_docker_compose_service}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 304,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 77,
+      "type": "stat",
+      "title": "Canary traffic percentage",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "biometric_canary_traffic_percent",
+          "legendFormat": "{{service}}{{task}}{{source}} {{window}} {{metric}} {{modality}} {{alias}}{{state}}{{feature}}{{outcome}}{{container_label_com_docker_compose_service}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 304,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 78,
+      "type": "stat",
+      "title": "Current stage samples",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "biometric_challenger_stage_samples",
+          "legendFormat": "{{service}}{{task}}{{source}} {{window}} {{metric}} {{modality}} {{alias}}{{state}}{{feature}}{{outcome}}{{container_label_com_docker_compose_service}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "gridPos": {
+        "x": 0,
+        "y": 312,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 79,
+      "type": "stat",
+      "title": "Rollback audit count",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "biometric_rollbacks_total",
+          "legendFormat": "{{service}}{{task}}{{source}} {{window}} {{metric}} {{modality}} {{alias}}{{state}}{{feature}}{{outcome}}{{container_label_com_docker_compose_service}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "gridPos": {
+        "x": 12,
+        "y": 312,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto"
+      }
     }
   ],
   "templating": {

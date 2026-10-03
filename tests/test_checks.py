@@ -97,6 +97,46 @@ def send(client, owner, person, media, request_id='capture-1', session_id='ANNUA
                              'request_id': request_id, 'consent': 'true'})
 
 
+def test_live_shadow_records_independent_modality_evidence_without_changing_response(checks_api):
+    from app.models import ModalityDeployment, ModalityObservation
+
+    client, engine, _, media, _ = checks_api
+    owner = company(client, 'Shadow company')
+    person = employee(client, owner, media)
+    with Session(engine) as db:
+        db.add(ModalityDeployment(modality='voice', registry_name='voice-verification',
+                                 champion_version='1', champion_threshold=.25,
+                                 challenger_version='2', challenger_threshold=1., state='SHADOW'))
+        db.commit()
+    result = send(client, owner, person, media).json()
+    assert result['integrity_status'] == 'verified'
+    with Session(engine) as db:
+        rows = list(db.scalars(select(ModalityObservation)))
+        assert len(rows) == 2
+        voice = next(row for row in rows if row.modality == 'voice')
+        assert voice.challenger_version == '2' and voice.served_candidate is False
+        assert voice.embedding is None
+        assert voice.quality['duration'] == 10
+        assert voice.integrity_passed
+    body = {'identity_truth': 'impostor', 'face_identity_truth': 'genuine',
+            'voice_identity_truth': 'impostor', 'cheating_judgement': 'undetermined',
+            'selection_reason': 'manual'}
+    assert client.put('/v1/checks/' + result['check_id'] + '/review',
+                      headers=owner['operator'], json=body).status_code == 200
+    with Session(engine) as db:
+        labels = {r.modality: r.truth for r in db.scalars(select(ModalityObservation))}
+        assert labels == {'face': True, 'voice': False}
+    path = '/v1/checks/' + result['check_id'] + '/review'
+    reviewed = client.get(path, headers=owner['operator']).json()
+    assert reviewed['face_identity_truth'] == 'genuine'
+    assert reviewed['voice_identity_truth'] == 'impostor'
+    del body['face_identity_truth'], body['voice_identity_truth']
+    body['notes'] = 'Only update the notes, preserve existing modality labels'
+    updated = client.put(path, headers=owner['operator'], json=body).json()
+    assert updated['face_identity_truth'] == 'genuine'
+    assert updated['voice_identity_truth'] == 'impostor'
+
+
 def test_company_review_is_tenant_scoped_and_separates_identity_from_cheating(checks_api):
     client, engine, _, media, _ = checks_api
     owner, other = company(client, 'Review owner'), company(client, 'Other reviewer')
@@ -328,6 +368,41 @@ def test_capture_validation_filters_and_subscription_disable(checks_api):
                      headers={'X-API-Key': 'checks-platform'}, json={'active': False})
     assert r.status_code == 200 and r.json()['data_retained']
     assert client.get('/v1/checks', headers=owner['operator']).status_code == 401
+
+
+def test_actual_verification_uses_canary_policy_and_restores_champion(checks_api, monkeypatch):
+    from app.model_lifecycle import reject
+    from app.models import ModalityDeployment
+
+    client, engine, _, media, main = checks_api
+    owner = company(client, 'Canary company')
+    person = employee(client, owner, media)
+    monkeypatch.setattr(main, 'cosine', lambda *_: .75)
+    with Session(engine) as db:
+        db.add(ModalityDeployment(modality='voice', registry_name='voice-verification',
+            champion_version='1', champion_threshold=.25, challenger_version='2',
+            challenger_threshold=.8, state='SHADOW'))
+        db.commit()
+
+    def verify():
+        response = client.post('/v1/verify', headers=owner['operator'], files=media,
+                               data={'person_id': person['id'], 'session_id': 'same-session'})
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    assert verify()['accepted']
+    with Session(engine) as db:
+        row = db.get(ModalityDeployment, 'voice')
+        row.state, row.traffic_percent = 'CANARY', 100
+        db.commit()
+    canary = verify()
+    assert not canary['accepted'] and canary['model_versions']['voice'] == '2'
+    assert 'voice_mismatch' in canary['reasons']
+    with Session(engine) as db:
+        reject(db, db.get(ModalityDeployment, 'voice'), 'fixture_regression', .2, .05)
+        db.commit()
+    restored = verify()
+    assert restored['accepted'] and restored['model_versions']['voice'] == '1'
 
 
 def test_csv_formula_values_are_neutralized():

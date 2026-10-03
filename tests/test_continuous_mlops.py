@@ -36,6 +36,15 @@ def test_identity_split_is_deterministic_and_holdout_never_enters_training():
     assert manifest['dataset_version'] == 'abc'
     assert manifest['tenant_scope'] == 'demo'
     assert manifest['split'] == first
+    # Existing immutable enrollment-only manifests must remain byte-compatible.
+    assert 'reviewed_samples' not in manifest
+
+
+def test_legacy_training_cli_cannot_bypass_modality_lifecycle(monkeypatch):
+    from pipeline.calibrate_and_register import main
+    monkeypatch.delenv('MODEL_MODALITY', raising=False)
+    with pytest.raises(ValueError, match='modality'):
+        main()
 
 
 def test_same_training_data_can_be_republished_without_changing_immutable_object():

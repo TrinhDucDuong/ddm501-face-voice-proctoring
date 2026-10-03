@@ -9,7 +9,7 @@ import numpy as np
 from sqlalchemy import create_engine
 
 
-def validate(rows: list[dict]) -> dict:
+def validate(rows: list[dict], modalities=('face', 'voice')) -> dict:
     errors: list[str] = []
     counts = Counter(row["modality"] for row in rows)
     dimensions: dict[str, set[int]] = defaultdict(set)
@@ -34,7 +34,7 @@ def validate(rows: list[dict]) -> dict:
         if key in hashes:
             errors.append(f"duplicate sample: {row['id']}")
         hashes.add(key)
-    for modality in ("face", "voice"):
+    for modality in modalities:
         if len(dimensions[modality]) != 1:
             errors.append(f"inconsistent {modality} dimensions: {sorted(dimensions[modality])}")
         if len(people[modality]) < 3:
@@ -60,7 +60,11 @@ def main() -> None:  # pragma: no cover - thin database/CLI adapter
         engine = create_engine(os.getenv("DATABASE_URL", "sqlite:///./data/biometric.db"))
         with engine.connect() as connection:
             rows = extract(connection)["samples"]
-    print(json.dumps(validate([dict(row) for row in rows]), indent=2))
+    modality = os.getenv('MODEL_MODALITY')
+    if modality in ('face', 'voice'):
+        rows = [r for r in rows if r['modality'] == modality]
+    print(json.dumps(validate([dict(row) for row in rows], (modality,) if modality in ('face', 'voice')
+                              else ('face', 'voice')), indent=2))
 
 
 if __name__ == "__main__":

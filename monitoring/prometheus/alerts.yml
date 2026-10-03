@@ -74,11 +74,22 @@ groups:
           summary: "Tenant feature drift; inspect the versioned monitoring window"
           description: "Tenant {{ $labels.tenant }}, model {{ $labels.model_version }}, feature {{ $labels.feature }} has PSI {{ $value }}. Check sample counts and review the monitoring DAG before retraining."
       - alert: BiometricRetrainRecommended
-        expr: biometric_retrain_recommended == 1
+        expr: biometric_modality_retrain_required == 1
         for: 2m
         labels: {severity: info}
         annotations:
-          summary: "Monitoring evidence requested challenger training; promotion still requires paired and reviewed gates"
+          summary: "Modality evidence requested training; offline, shadow and canary gates still required"
+      - alert: BiometricModalityInputDrift
+        expr: biometric_modality_drift_state{state="INPUT_DRIFT"} > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Capture environment changed; investigate input, do not retrain on quality drift alone"
+      - alert: BiometricCanaryRolledBack
+        expr: biometric_deployment_state{state="FAILED_CANARY"} == 1
+        labels: {severity: critical}
+        annotations:
+          summary: "Canary failed; traffic returned to champion. Inspect lifecycle audit before retrying."
       - alert: MonitoringETLStale
         expr: time() - biometric_monitoring_etl_unixtime > 7200
         for: 10m

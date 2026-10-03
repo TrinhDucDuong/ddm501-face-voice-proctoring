@@ -3,20 +3,36 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 
+
+def training_failure(context):
+    import os
+
+    import requests
+
+    conf = context['dag_run'].conf
+    if conf.get('modality') in ('face', 'voice'):
+        response = requests.post(os.environ['API_URL'].rstrip('/') +
+            f"/v1/admin/lifecycle/{conf['modality']}/training-failed",
+            headers={'X-API-Key': os.environ['API_KEY']}, json={'window_id': conf.get('window_id', '')}, timeout=30)
+        response.raise_for_status()
+
 default_args = {
     "owner": "ml-platform", "retries": 1, "retry_delay": timedelta(minutes=2),
-    "env": {"SNAPSHOT_PATH": "/opt/project/data/snapshots/snapshot-{{ ts_nodash }}.json"},
+    "env": {"SNAPSHOT_PATH": "/opt/project/data/snapshots/snapshot-{{ ts_nodash }}-{{ dag_run.conf.get('modality', 'invalid') }}.json",
+            "MODEL_MODALITY": "{{ dag_run.conf.get('modality', 'invalid') }}",
+            "TRAINING_WINDOW_ID": "{{ dag_run.conf.get('window_id', '') }}"},
     "append_env": True,
+    "on_failure_callback": training_failure,
 }
 
 with DAG(
     dag_id="biometric_model_pipeline",
     description="Ingest, validate, feature/calibrate, evaluate, register, promote and deploy",
     start_date=datetime(2026, 1, 1),
-    schedule="0 2 * * 0",
+    schedule=None,
     catchup=False,
     default_args=default_args,
-    max_active_runs=1,
+    max_active_runs=2,
     tags=["ddm501", "biometrics", "mlflow"],
 ) as dag:
     ingest = BashOperator(

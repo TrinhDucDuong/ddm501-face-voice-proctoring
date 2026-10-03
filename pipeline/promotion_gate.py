@@ -165,19 +165,19 @@ def promote(client, model_name, candidate, expected_run_id=None):
 
 
 def main() -> None:  # pragma: no cover - exercised against MLflow in the Airflow integration test
-    import mlflow
-    from mlflow import MlflowClient
+    if os.getenv('MODEL_MODALITY') in ('face', 'voice'):
+        from pathlib import Path
 
-    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:15020"))
-    model_name = os.getenv("MLFLOW_MODEL_NAME", "face-voice-risk-bundle")
-    client = MlflowClient()
-    candidate = client.get_model_version_by_alias(model_name, "candidate")
-    run = client.get_run(candidate.run_id)
-    if os.getenv('SNAPSHOT_PATH'):
-        from data_snapshot import read_snapshot
-        if run.data.params.get('dataset_version') != read_snapshot(os.environ['SNAPSHOT_PATH'])['dataset_version']:
-            raise RuntimeError('Candidate snapshot does not match this DAG run')
-    promote(client, model_name, candidate)
+        import requests
+        evidence = json.loads(Path(os.environ['SNAPSHOT_PATH'] + '.candidate.json').read_text(encoding='utf-8'))
+        response = requests.post(os.environ['API_URL'].rstrip('/') +
+                                 '/v1/admin/lifecycle/' + evidence['modality'] + '/candidate',
+                                 headers={'X-API-Key': os.environ['API_KEY']},
+                                 json={'version': evidence['version'], 'window_id': evidence['window_id']}, timeout=90)
+        response.raise_for_status()
+        print(json.dumps(response.json()))
+        return
+    raise RuntimeError('Direct champion promotion is disabled; supply MODEL_MODALITY through Airflow')
 
 
 if __name__ == "__main__":

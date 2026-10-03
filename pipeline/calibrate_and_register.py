@@ -1,29 +1,18 @@
 """Calibrate verification thresholds from enrolled samples and register an MLflow bundle."""
 from __future__ import annotations
 
-import argparse
 import itertools
 import json
 import os
-import tempfile
-import time
 
 import mlflow
 import mlflow.pyfunc
 import numpy as np
-import pandas as pd
-from mlflow import MlflowClient
-from mlflow.models import infer_signature
-from sqlalchemy import create_engine
 
 if __package__:
-    from .data_snapshot import extract, read_snapshot
-    from .evaluation import identity_evaluation, select_trial
-    from .validate_data import validate
+    pass
 else:
-    from data_snapshot import extract, read_snapshot
-    from evaluation import identity_evaluation, select_trial
-    from validate_data import validate
+    pass
 
 
 def cosine(a, b) -> float:
@@ -100,90 +89,10 @@ class RiskBundle(mlflow.pyfunc.PythonModel):
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--promote", action="store_true", help="Move champion alias to this version")
-    args = parser.parse_args()
-    database_url = os.getenv("DATABASE_URL", "sqlite:///./data/biometric.db")
-    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:15020")
-    model_name = os.getenv("MLFLOW_MODEL_NAME", "face-voice-risk-bundle")
-    if os.getenv("SNAPSHOT_PATH"):
-        snapshot = read_snapshot(os.environ["SNAPSHOT_PATH"])
-    else:
-        engine = create_engine(database_url)
-        with engine.connect() as connection:
-            snapshot = extract(connection)
-        engine.dispose()
-    raw = snapshot["samples"]
-    quality = validate(raw)
-    grouped = {"face": [], "voice": []}
-    for row in raw:
-        embedding = row["embedding"]
-        if isinstance(embedding, str):
-            embedding = json.loads(embedding)
-        grouped[row["modality"]].append({"person_id": row["person_id"], "embedding": embedding})
-    metrics, thresholds, evaluations = {}, {}, {}
-    for modality in ("face", "voice"):
-        threshold, result, evaluation = identity_evaluation(grouped[modality], max_error_rate=float(os.getenv('MAX_BIOMETRIC_ERROR_RATE', '.20')))
-        evaluations[modality] = evaluation
-        thresholds[f"{modality}_threshold"] = threshold
-        metrics.update({f"{modality}_{key}": value for key, value in result.items()})
-    mlflow.set_tracking_uri(tracking_uri)
-    mlflow.set_experiment("face-voice-calibration")
-    with tempfile.TemporaryDirectory() as directory:
-        path = os.path.join(directory, "thresholds.json")
-        with open(path, "w", encoding="utf-8") as handle:
-            json.dump(thresholds, handle, indent=2)
-        with mlflow.start_run() as run:
-            mlflow.log_params({
-                "dataset": "enrolled-samples", "modalities": "face,voice",
-                "dataset_version": snapshot["dataset_version"],
-                "dataset_samples": len(raw),
-                "training_tenant_scope": snapshot.get("tenant_scope", "demo"),
-                "threshold_grid_min": -0.2, "threshold_grid_max": 0.95,
-                "threshold_grid_steps": 1151, "objective": "minimize_worst_far_frr_then_minimum_cv_gate_margin",
-                "selection_method": "internal_cv_only_holdout_reserved",
-            })
-            mlflow.log_metrics(metrics)
-            mlflow.log_params({**thresholds, 'evaluation_method': 'identity-disjoint-max-template'})
-            mlflow.log_dict(evaluations, 'evaluation/identity-disjoint.json')
-            for modality, evaluation in evaluations.items():
-                for objective in ('minimax', 'balanced_error', 'far_constrained'):
-                    trial = select_trial(evaluation['trials'], objective)
-                    with mlflow.start_run(run_name=f'{modality}-{objective}', nested=True):
-                        mlflow.log_params({'modality': modality, 'objective': objective,
-                                           'threshold': trial['threshold'], 'dataset_version': snapshot['dataset_version']})
-                        mlflow.log_metrics({k:trial[k] for k in ('far', 'frr')})
-            mlflow.log_dict(snapshot, "data/snapshot.json")
-            mlflow.log_dict(quality, "data/validation.json")
-            mlflow.log_artifact(path, artifact_path="evaluation")
-            input_example = pd.DataFrame({"face_score": [0.8], "voice_score": [0.7]})
-            mlflow.pyfunc.log_model(
-                artifact_path="bundle", python_model=RiskBundle(), artifacts={"thresholds": path},
-                registered_model_name=model_name,
-                input_example=input_example,
-                signature=infer_signature(input_example, np.asarray([0], dtype=int)),
-            )
-            mlflow.set_tags({
-                "purpose": "threshold-calibration", "run_id": run.info.run_id,
-                "data_stage": "validated", "model_family": "cosine-threshold-policy",
-            })
-    client = MlflowClient()
-    versions = client.search_model_versions(f"name='{model_name}'")
-    version = max((item for item in versions if item.run_id == run.info.run_id), key=lambda item: int(item.version))
-    for _ in range(30):
-        version = client.get_model_version(model_name, version.version)
-        if version.status == "READY":
-            break
-        time.sleep(1)
-    client.set_registered_model_alias(model_name, "candidate", version.version)
-    client.set_registered_model_alias(model_name, "challenger", version.version)
-    if args.promote:
-        if __package__:
-            from .promotion_gate import promote
-        else:
-            from promotion_gate import promote
-        promote(client, model_name, version, run.info.run_id)
-    print(json.dumps({"model": model_name, "version": version.version, "thresholds": thresholds, "metrics": metrics}, indent=2))
+    if os.getenv('MODEL_MODALITY') not in ('face', 'voice'):
+        raise ValueError('Airflow training requires face or voice modality and an eligible monitoring window')
+    from pipeline.modality_training import train
+    train(os.environ['MODEL_MODALITY'])
 
 
 if __name__ == "__main__":

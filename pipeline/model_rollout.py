@@ -40,31 +40,10 @@ def reload_with_rollback(client, model_name, new_version, previous_version, relo
 
 def main():
     import requests
-    from mlflow import MlflowClient
-
-    client = MlflowClient(tracking_uri=os.environ['MLFLOW_TRACKING_URI'])
-    model = os.getenv('MLFLOW_MODEL_NAME', 'face-voice-risk-bundle')
-    champion = client.get_model_version_by_alias(model, 'champion')
-    candidate = client.get_model_version_by_alias(model, 'candidate')
-    previous = champion.tags.get('rollback_version')
-    session = requests.Session()
-    session.trust_env = False
-    base = os.environ['API_URL'].rstrip('/')
-    headers = {'X-API-Key': os.environ['API_KEY']}
-
-    def reload():
-        response = session.post(base + '/v1/admin/reload-model', headers=headers, timeout=90)
-        response.raise_for_status()
-
-    def ready():
-        response = session.get(base + '/ready', timeout=20)
-        response.raise_for_status()
-        return response.json()
-
-    result = reload_with_rollback(client, model, champion.version, previous, reload, ready,
-                                  observe_seconds=int(os.getenv('MODEL_OBSERVE_SECONDS', '30')),
-                                  candidate_version=candidate.version)
-    print(json.dumps(result))
+    response = requests.post(os.environ['API_URL'].rstrip('/') + '/v1/admin/lifecycle/tick',
+                             headers={'X-API-Key': os.environ['API_KEY']}, timeout=90)
+    response.raise_for_status()
+    print(json.dumps(response.json()))
 
 
 if __name__ == '__main__':

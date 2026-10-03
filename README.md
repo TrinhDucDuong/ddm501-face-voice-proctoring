@@ -20,7 +20,7 @@ SFace/YuNet + ECAPA xác minh danh tính. MiniFASNet face PAD và AASIST audio a
 
 PostgreSQL lưu embedding/metadata/checks/review; MinIO lưu suspicious evidence, MLflow artifacts và các snapshot feature/nhãn có phiên bản cho MLOps. Raw enrollment và media check hợp lệ không được giữ mặc định. Lịch sử, exports và evidence downloads đều tenant-scoped. Webhook HMAC có durable outbox/retry; receiver phải deduplicate.
 
-Airflow có hai DAG: `biometric_monitoring_pipeline` chạy mỗi giờ để chốt drift và nhãn human, `biometric_model_pipeline` tạo challenger và chỉ đổi champion khi qua gate. Xem [vòng Continuous MLOps](docs/CONTINUOUS_MLOPS.md) để biết điều kiện trigger, data lake, rollback và giới hạn hiện tại.
+Airflow có hai DAG: monitoring mỗi giờ và hiệu chỉnh ngưỡng theo yêu cầu riêng Face/Voice. Source hiện có decision engine nhiều tầng, template có phiên bản và luồng `candidate → offline → challenger → shadow → canary → champion/rollback`; drift thống kê đơn lẻ không kích hoạt train. Xem [lifecycle và giới hạn thực tế](docs/MODALITY_LIFECYCLE.md), [Continuous MLOps](docs/CONTINUOUS_MLOPS.md) và [bằng chứng theo từng phiên bản](VERIFICATION.md). Phần nâng cấp lifecycle mới đã deploy local bằng Docker Compose ngày 03/10/2026, API và monitoring DAG hoạt động; chưa có bằng chứng GitHub CI/deploy cho source mới hoặc rollout production đầy đủ.
 
 ## Chạy và kiểm chứng
 

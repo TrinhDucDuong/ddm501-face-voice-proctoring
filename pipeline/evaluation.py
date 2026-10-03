@@ -4,19 +4,30 @@ import itertools
 import numpy as np
 
 
-def policy_scores(rows):
+def policy_scores(rows, max_impostor_pairs=10000, max_templates=20):
     subjects = {}
     for row in rows:
         vector = np.asarray(row['embedding'], dtype=float)
         subjects.setdefault(str(row['person_id']), []).append(vector / np.linalg.norm(vector))
     genuine, impostor = [], []
+    for person, vectors in subjects.items():
+        if len(vectors) > max_templates:
+            subjects[person] = [vectors[i] for i in np.linspace(0, len(vectors) - 1, max_templates, dtype=int)]
     for vectors in subjects.values():
         for index, probe in enumerate(vectors):
             references = vectors[:index] + vectors[index + 1:]
             if references:
                 genuine.append(max(float(probe @ ref) for ref in references))
     people = sorted(subjects)
-    for first, second in itertools.combinations(people, 2):
+    if len(people) * (len(people) - 1) // 2 <= max_impostor_pairs:
+        comparisons = itertools.combinations(people, 2)
+    else:
+        rng, selected = np.random.default_rng(501), set()
+        while len(selected) < max_impostor_pairs:
+            a, b = sorted(rng.choice(len(people), size=2, replace=False).tolist())
+            selected.add((a, b))
+        comparisons = ((people[a], people[b]) for a, b in sorted(selected))
+    for first, second in comparisons:
         impostor.append(max(float(subjects[first][0] @ ref) for ref in subjects[second]))
     return np.asarray(genuine), np.asarray(impostor)
 

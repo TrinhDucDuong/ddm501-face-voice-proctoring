@@ -246,16 +246,27 @@ try:
                                        'Không xác nhận gian lận': 'dismissed'}
                     reason_labels = {'Hệ thống báo nghi vấn': 'suspicious', 'Kiểm tra ngẫu nhiên': 'random_audit',
                                      'Điểm gần ngưỡng': 'near_threshold', 'Kiểm tra thủ công': 'manual'}
+                    saved_review = api('GET', f"/v1/checks/{r['check_id']}/review")
                     with st.form('review-'+r['check_id']):
-                        identity_label = st.selectbox('Danh tính thực tế', list(identity_labels))
-                        cheating_label = st.selectbox('Kết luận về gian lận', list(cheating_labels))
+                        identity_label = st.selectbox('Danh tính thực tế', list(identity_labels),
+                            index=list(identity_labels.values()).index(saved_review.get('identity_truth', 'unknown')))
+                        face_identity_label = st.selectbox('Danh tính trong ảnh khuôn mặt', list(identity_labels),
+                            index=list(identity_labels.values()).index(saved_review.get('face_identity_truth', 'unknown')),
+                            help='Chọn Chưa xác định nếu chưa có căn cứ độc lập để xác minh ảnh.')
+                        voice_identity_label = st.selectbox('Danh tính trong bản ghi giọng nói', list(identity_labels),
+                            index=list(identity_labels.values()).index(saved_review.get('voice_identity_truth', 'unknown')),
+                            help='Đánh giá riêng giọng nói; không suy ra từ kết quả nhận diện khuôn mặt.')
+                        cheating_label = st.selectbox('Kết luận về gian lận', list(cheating_labels),
+                            index=list(cheating_labels.values()).index(saved_review.get('cheating_judgement', 'undetermined')))
                         selection_label = st.selectbox('Vì sao chọn lượt này để kiểm duyệt', list(reason_labels),
                                                        index=list(reason_labels.values()).index(
-                                                           review_suggestions.get(r['check_id'], 'manual')))
-                        review_notes = st.text_area('Ghi chú và căn cứ')
+                                                           saved_review.get('selection_reason', review_suggestions.get(r['check_id'], 'manual'))))
+                        review_notes = st.text_area('Ghi chú và căn cứ', value=saved_review.get('notes') or '')
                         if st.form_submit_button('Lưu kết quả kiểm duyệt', type='primary'):
                             review = api('PUT', f"/v1/checks/{r['check_id']}/review", json={
                                 'identity_truth': identity_labels[identity_label],
+                                'face_identity_truth': identity_labels[face_identity_label],
+                                'voice_identity_truth': identity_labels[voice_identity_label],
                                 'cheating_judgement': cheating_labels[cheating_label],
                                 'selection_reason': reason_labels[selection_label], 'notes': review_notes or None})
                             st.success('Đã lưu kết quả kiểm duyệt riêng với dự đoán của model.')

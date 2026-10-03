@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 
 def dataset_version(rows: list[dict]) -> str:
@@ -29,6 +29,23 @@ def extract(connection) -> dict:
     for row in rows:
         if isinstance(row["embedding"], str):
             row["embedding"] = json.loads(row["embedding"])
+    modality = os.getenv('MODEL_MODALITY')
+    if modality in ('face', 'voice') and inspect(connection).has_table('modality_observations'):
+        reviewed = connection.execute(text(
+            "SELECT id, person_id, modality, embedding, quality, media_sha256 FROM modality_observations "
+            "WHERE tenant_id=:tenant AND modality=:modality AND truth=true AND random_audit=true "
+            "AND integrity_passed=true AND embedding IS NOT NULL ORDER BY created_at DESC LIMIT 10000"
+        ), {'tenant': tenant, 'modality': modality}).mappings()
+        seen = {(r['person_id'], r['modality'], r['sha256']) for r in rows}
+        for item in reviewed:
+            key = (item['person_id'], item['modality'], item['media_sha256'])
+            quality = json.loads(item['quality']) if isinstance(item['quality'], str) else item['quality']
+            vector = json.loads(item['embedding']) if isinstance(item['embedding'], str) else item['embedding']
+            if key not in seen and vector and quality.get('quality', 0) >= .7:
+                rows.append({'id': 'reviewed-' + item['id'], 'person_id': item['person_id'],
+                             'modality': item['modality'], 'embedding': vector,
+                             'quality': quality['quality'], 'sha256': item['media_sha256']})
+                seen.add(key)
     return {"schema_version": 2, "dataset_version": dataset_version(rows), "samples": rows,
             "tenant_scope": tenant,
             "created_at": datetime.now(timezone.utc).isoformat()}

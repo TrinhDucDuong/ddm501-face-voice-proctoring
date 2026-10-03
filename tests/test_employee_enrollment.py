@@ -30,8 +30,8 @@ def test_employee_invitation_one_submission_and_replay(enrollment_saas, monkeypa
     created = client.post("/v1/people", headers=owner["operator"], json={
         "external_id": "EMP-1", "display_name": "Lan Nguyen"}).json()
     main = importlib.import_module("app.main")
-    monkeypatch.setattr(main.biometrics, "face", lambda data: SimpleNamespace(embedding=SimpleNamespace(tolist=lambda: [float(len(data))]), quality=0.9))
-    monkeypatch.setattr(main.biometrics, "voice", lambda data: SimpleNamespace(embedding=SimpleNamespace(tolist=lambda: [float(len(data))]), quality=0.9))
+    monkeypatch.setattr(main.biometrics, "face", lambda data: SimpleNamespace(embedding=SimpleNamespace(tolist=lambda: [float(len(data))]), quality=0.9, backend='fixture'))
+    monkeypatch.setattr(main.biometrics, "voice", lambda data: SimpleNamespace(embedding=SimpleNamespace(tolist=lambda: [float(len(data))]), quality=0.9, backend='fixture'))
     monkeypatch.setattr(main.object_store, "put", lambda *args: None)
 
     issue = client.post(f"/v1/people/{created['id']}/enrollment-invitations", headers=owner["operator"])

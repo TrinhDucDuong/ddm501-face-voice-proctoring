@@ -1,5 +1,28 @@
 # Kiểm chứng MLOps và company service (Asia/Saigon)
 
+## Kiểm tra trước khi push lifecycle 03/10/2026
+
+- Chạy lại toàn bộ suite trên Windows/Python 3.10.11: **146 passed, 0 skipped**, coverage theo scope CI **82,53%**; gồm hai test deployment preflight Windows và bốn case hồi quy MLflow REST alias. JUnit: `reports/lifecycle-push-tests.xml` (gitignored).
+- Ruff, compileall, generated-dashboard consistency, Docker Compose config và staged diff check pass. Bằng chứng local này không thay thế kết quả GitHub Actions của commit được push sau đó; các ghi chú chưa commit/push bên dưới mô tả thời điểm deploy local trước lượt push này.
+
+## Chạy lifecycle local 03/10/2026
+
+- Đã build và deploy working tree bằng Docker Compose, release ngoài OneDrive: `C:/Users/tdd23/AppData/Local/DDM501/deployments/local-lifecycle-20261003-125122`. Source chưa commit/push; manifest SHA-256 tại `local-source-manifest.json` trong release. Giữ nguyên cấu hình và volumes; backup PostgreSQL trước deploy: `data/backups/local-lifecycle-20261003-125122.dump` (645749 bytes).
+- Tám endpoint Portal, exam, API, Grafana, Airflow, MLflow, MinIO và Prometheus trả HTTP 200. API `/ready` báo `healthy`, backend `pretrained`, `model_version=face:1|voice:1`. Bootstrap tạo champion policy riêng Face/Voice từ ngưỡng champion hiện có, không phải promotion model mới sau retrain. Báo cáo: `reports/local-lifecycle-startup.json`, `reports/local-lifecycle-release.json`.
+- Monitoring DAG run `local_lifecycle_20261003_1255`: `collect_versioned_monitoring_windows`, `decide_retraining`, `no_training_needed` success; `trigger_candidate_training` skipped đúng nhánh vì chưa đủ bằng chứng để retrain.
+- `verify_monitoring_centre.py`: cả ba nhóm dashboard queries, collector/container freshness và protected reports/sources pass; report `reports/monitoring-verification.json`. Verifier đã cập nhật tập collector gồm `lifecycle`.
+- Sửa bootstrap tương thích lỗi thiếu alias của MLflow REST/SQL store (`INVALID_PARAMETER_VALUE` với thông báo cụ thể); không nuốt lỗi Registry khác. Test hồi quy và tích hợp trong `test_lifecycle_registry_integration.py`: **5 passed**. Kết quả toàn bộ **142 passed** bên dưới thuộc lượt trước khi thêm bốn case hồi quy này.
+- Đây là bằng chứng startup và monitoring thật trên máy local. Chưa thực hiện retrain, shadow/canary hoặc promotion mới bằng dữ liệu production; chưa có GitHub Actions cho working tree lifecycle mới.
+
+## Lifecycle Face/Voice độc lập: kiểm thử source local 03/10/2026
+
+- Phạm vi đã chọn: hiệu chỉnh ngưỡng độc lập trên SFace/ECAPA pretrained; không fine-tune encoder. Mapping, công thức, ngưỡng, flow và danh sách file ở [MODALITY_LIFECYCLE.md](docs/MODALITY_LIFECYCLE.md).
+- Bộ test cuối chạy trên Windows/Python 3.10.11: **142 passed, 0 skipped, 0 failures/errors**, 14 warning từ dependencies; coverage theo đúng scope CI **82,52%**, vượt ngưỡng 80%. JUnit `reports/lifecycle-tests.xml`, `coverage.xml` (gitignored). Đây là kết quả local; CI GitHub dùng Python 3.11 chưa chạy source lifecycle mới.
+- Test tích hợp dùng **MLflow thật với file tracking store tạm**, SQL/HTTP API thật trong fixture: bootstrap hai modality, claim, đăng ký có idempotency, đối chiếu artifact, offline gate, shadow, canary, promotion, alias/tag rollback và tạo lại reference có audit. Face đổi version trong khi Voice giữ nguyên. Dữ liệu score/nhãn của test là tổng hợp, không phải ground truth production.
+- Test API gửi media fixture chứng minh shadow giữ quyết định champion; canary chọn ngưỡng challenger; rollback trả response về champion. Test template kiểm tra capture trùng, xung đột danh tính, holdout độc lập, activation và rollback giữ enrollment gốc. Test drift chặn quality-only, thiếu nhãn, cohort không tương thích, cửa sổ lặp và template update giữa rollout.
+- Ruff, compileall, Compose config, generated-dashboard consistency và `git diff --check` pass. Hai DAG đã được import từ source trong môi trường Airflow đang có: model DAG 7 task, không lịch tự train; monitoring DAG 4 task, lịch mỗi giờ. Không chạy một training DAG production mới trong phiên này.
+- Tại thời điểm kiểm thử source, bản nâng cấp chưa commit/push/deploy; sau đó đã deploy local như mục trên. GitHub run thành công ở các mục dưới thuộc bản trước, không phải bằng chứng triển khai lifecycle mới. Chưa có benchmark tải 50.000 nhân viên, kiểm chứng PostgreSQL concurrency hoặc nhãn production đủ để xác nhận chất lượng/promotion; không kết luận production-ready.
+
 ## Deploy GitHub Actions 02/10/2026, đối chiếu ngày 03/10/2026
 
 - Repository hiện dùng để đối chiếu CI/deploy: [FSB-MSA36HN/DDM501-face-voice-proctoring](https://github.com/FSB-MSA36HN/DDM501-face-voice-proctoring). Các link repo cá nhân ở những mục baseline bên dưới là bằng chứng lịch sử.

@@ -76,7 +76,7 @@ def verify(send_alert=False):
     def collectors():
         result = get('/api/datasources/proxy/uid/prometheus/api/v1/query',params={'query':'biometric_ops_collection_success'})['data']['result']
         assert {r['metric']['component'] for r in result} == {
-            'database', 'registry', 'airflow', 'docker', 'monitoring', 'monitoring_dag'}
+            'database', 'registry', 'airflow', 'docker', 'monitoring', 'monitoring_dag', 'lifecycle'}
         assert all(r['value'][1] == '1' for r in result), result
         age = get('/api/datasources/proxy/uid/prometheus/api/v1/query',params={'query':'time()-biometric_ops_last_success_unixtime'})['data']['result']
         assert all(float(r['value'][1]) < 180 for r in age), age

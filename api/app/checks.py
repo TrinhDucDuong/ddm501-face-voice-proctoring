@@ -22,6 +22,7 @@ from .models import (
     CheckEvidence,
     CheckReview,
     IntegrityCheck,
+    ModalityObservation,
     Tenant,
     VerificationFeedback,
     WebhookDelivery,
@@ -57,10 +58,17 @@ class ReviewInput(BaseModel):
     cheating_judgement: Literal['confirmed', 'dismissed', 'undetermined']
     selection_reason: Literal['suspicious', 'random_audit', 'near_threshold', 'manual']
     notes: str | None = Field(default=None, max_length=1000)
+    face_identity_truth: Literal['genuine', 'impostor', 'unknown'] = 'unknown'
+    voice_identity_truth: Literal['genuine', 'impostor', 'unknown'] = 'unknown'
 
 
-def review_output(row):
+def review_output(row, db, event_id):
+    labels = {'face_identity_truth': 'unknown', 'voice_identity_truth': 'unknown'}
+    for observation in db.scalars(select(ModalityObservation).where(ModalityObservation.event_id == event_id)):
+        labels[observation.modality + '_identity_truth'] = (
+            'genuine' if observation.truth is True else 'impostor' if observation.truth is False else 'unknown')
     return {'check_id': row.check_id, 'identity_truth': row.identity_truth,
+            **labels,
             'cheating_judgement': row.cheating_judgement,
             'selection_reason': row.selection_reason, 'notes': row.notes,
             'reviewer': row.reviewer, 'source': 'human',
@@ -95,9 +103,9 @@ def review_queue(db: Session = Depends(get_db), principal: Principal = Depends(o
 
 @router.get('/v1/checks/{check_id}/review')
 def get_review(check_id: str, db: Session = Depends(get_db), principal: Principal = Depends(operator)):
-    scoped_check(db, check_id, principal)
+    check = scoped_check(db, check_id, principal)
     row = db.get(CheckReview, check_id)
-    return {'check_id': check_id, 'status': 'pending'} if row is None else review_output(row)
+    return {'check_id': check_id, 'status': 'pending'} if row is None else review_output(row, db, check.event_id)
 
 
 @router.put('/v1/checks/{check_id}/review')
@@ -117,6 +125,12 @@ def put_review(check_id: str, body: ReviewInput, db: Session = Depends(get_db),
     row.notes = body.notes
     row.reviewer = 'operator:' + principal.key_id
     row.updated_at = datetime.now(timezone.utc)
+    for observation in db.scalars(select(ModalityObservation).where(ModalityObservation.event_id == check.event_id)):
+        if observation.modality + '_identity_truth' not in body.model_fields_set:
+            continue
+        truth = getattr(body, observation.modality + '_identity_truth')
+        observation.truth = True if truth == 'genuine' else False if truth == 'impostor' else None
+        observation.random_audit = sampled
     feedback = db.scalar(select(VerificationFeedback).where(VerificationFeedback.event_id == check.event_id))
     if body.identity_truth == 'unknown':
         if feedback is not None:
@@ -132,7 +146,7 @@ def put_review(check_id: str, body: ReviewInput, db: Session = Depends(get_db),
           details=f'{body.identity_truth}/{body.cheating_judgement}/{row.selection_reason}')
     db.commit()
     db.refresh(row)
-    return review_output(row)
+    return review_output(row, db, check.event_id)
 
 
 def check_query(principal, person_id=None, session_id=None, start=None, end=None):
@@ -200,6 +214,10 @@ async def submit_check(request: Request, person_id: str = Form(...),
                    for key in ('face_pad', 'audio_spoof', 'speaker_consistency'))
     status = 'suspicious' if suspicious_codes.intersection(codes) else 'inconclusive' if codes or not complete else 'verified'
     row.event_id, row.integrity_status = outcome.event_id, status
+    for observation in db.scalars(select(ModalityObservation).where(ModalityObservation.event_id == outcome.event_id)):
+        observation.integrity_passed = (all(capabilities.get(k, {}).get('status') == 'passed'
+                                           for k in ('face_pad', 'audio_spoof', 'speaker_consistency'))
+                                        and not (set(codes) - {'face_mismatch', 'voice_mismatch'}))
     evidence_status = 'not_retained'
     if status == 'suspicious':
         saved = 0
@@ -226,6 +244,7 @@ async def submit_check(request: Request, person_id: str = Form(...),
         'face_score': outcome.face_score, 'voice_score': outcome.voice_score,
         'reason_codes': codes, 'reason_labels': [LABELS.get(code, code) for code in codes],
         'capabilities': capabilities, 'model_version': outcome.model_version,
+        'model_versions': outcome.model_versions,
         'latency_ms': outcome.latency_ms, 'evidence_status': evidence_status,
     }
     row.result = result

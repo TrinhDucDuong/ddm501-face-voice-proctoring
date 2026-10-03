@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -186,4 +187,99 @@ class CheckReview(Base):
     reviewer: Mapped[str] = mapped_column(String(100))
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ModalityObservation(Base):
+    __tablename__ = 'modality_observations'
+    __table_args__ = (UniqueConstraint('event_id', 'modality'),
+                     Index('ix_modality_monitor_window', 'tenant_id', 'modality', 'model_version', 'created_at'),
+                     Index('ix_modality_rollout_window', 'deployment_id', 'modality', 'created_at'))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    event_id: Mapped[str] = mapped_column(ForeignKey('verification_events.id'), index=True)
+    tenant_id: Mapped[str] = mapped_column(String(36), index=True)
+    person_id: Mapped[str] = mapped_column(ForeignKey('people.id'), index=True)
+    modality: Mapped[str] = mapped_column(String(16), index=True)
+    model_version: Mapped[str] = mapped_column(String(100), index=True)
+    encoder: Mapped[str] = mapped_column(String(100))
+    template_version: Mapped[str] = mapped_column(String(100))
+    template_age_days: Mapped[float] = mapped_column(Float)
+    score: Mapped[float] = mapped_column(Float)
+    threshold: Mapped[float] = mapped_column(Float)
+    quality: Mapped[dict] = mapped_column(JSON)
+    embedding: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    media_sha256: Mapped[str] = mapped_column(String(64))
+    truth: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    random_audit: Mapped[bool] = mapped_column(Boolean, default=False)
+    integrity_passed: Mapped[bool] = mapped_column(Boolean, default=False)
+    deployment_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    stage: Mapped[str] = mapped_column(String(20), default='CHAMPION')
+    served_candidate: Mapped[bool] = mapped_column(Boolean, default=False)
+    challenger_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    challenger_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    challenger_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    policy_latency_ms: Mapped[float] = mapped_column(Float, default=0)
+    challenger_latency_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class TemplateVersion(Base):
+    __tablename__ = 'template_versions'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id: Mapped[str] = mapped_column(String(36), index=True)
+    person_id: Mapped[str] = mapped_column(ForeignKey('people.id'), index=True)
+    modality: Mapped[str] = mapped_column(String(16))
+    encoder: Mapped[str] = mapped_column(String(100))
+    embeddings: Mapped[list] = mapped_column(JSON)
+    previous_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    state: Mapped[str] = mapped_column(String(40), default='PENDING_REVIEW')
+    evidence: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ActiveTemplate(Base):
+    __tablename__ = 'active_templates'
+    person_id: Mapped[str] = mapped_column(ForeignKey('people.id'), primary_key=True)
+    modality: Mapped[str] = mapped_column(String(16), primary_key=True)
+    version_id: Mapped[str] = mapped_column(ForeignKey('template_versions.id'))
+
+
+class ModalityDeployment(Base):
+    __tablename__ = 'modality_deployments'
+    modality: Mapped[str] = mapped_column(String(16), primary_key=True)
+    deployment_id: Mapped[str] = mapped_column(String(36), default=lambda: str(uuid.uuid4()))
+    revision: Mapped[int] = mapped_column(Integer, default=0)
+    state: Mapped[str] = mapped_column(String(40), default='CHAMPION')
+    registry_name: Mapped[str] = mapped_column(String(120))
+    champion_version: Mapped[str] = mapped_column(String(100))
+    champion_threshold: Mapped[float] = mapped_column(Float)
+    challenger_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    challenger_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    previous_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    previous_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    stage_index: Mapped[int] = mapped_column(Integer, default=0)
+    traffic_percent: Mapped[float] = mapped_column(Float, default=0)
+    evidence: Mapped[dict] = mapped_column(JSON, default=dict)
+    stage_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class LifecycleAudit(Base):
+    __tablename__ = 'lifecycle_audit'
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    modality: Mapped[str] = mapped_column(String(16), index=True)
+    deployment_id: Mapped[str] = mapped_column(String(36), index=True)
+    state: Mapped[str] = mapped_column(String(40))
+    evidence: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ModalityMonitorState(Base):
+    __tablename__ = 'modality_monitor_state'
+    tenant_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    modality: Mapped[str] = mapped_column(String(16), primary_key=True)
+    model_version: Mapped[str] = mapped_column(String(100), primary_key=True)
+    reference: Mapped[list] = mapped_column(JSON, default=list)
+    report: Mapped[dict] = mapped_column(JSON, default=dict)
+    last_action_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

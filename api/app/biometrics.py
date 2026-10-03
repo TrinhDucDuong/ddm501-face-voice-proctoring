@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import math
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import cv2
@@ -25,6 +25,7 @@ class EmbeddingResult:
     embedding: np.ndarray
     quality: float
     backend: str
+    quality_features: dict = field(default_factory=dict)
 
 
 def normalize(vector: np.ndarray) -> np.ndarray:
@@ -106,17 +107,25 @@ class BiometricEngine:
         if quality < 0.12:
             raise BiometricError("Ảnh quá tối, sáng hoặc mờ")
         if self.backend == "pretrained":
-            embedding = self._sface(image)
+            embedding, detection = self._sface(image, with_metadata=True)
             backend = "opencv-sface-2021dec"
         else:
+            detection = {}
             gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
             resized = cv2.resize(gray, (32, 32), interpolation=cv2.INTER_AREA).astype(np.float32) / 255.0
             embedding = cv2.dct(resized)[:16, :16].reshape(-1)
             backend = "demo-dct"
-        return EmbeddingResult(normalize(embedding), quality, backend)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        return EmbeddingResult(normalize(embedding), quality, backend, {
+            'quality': quality, 'brightness': float(gray.mean()), 'contrast': float(gray.std()),
+            'blur': float(cv2.Laplacian(gray, cv2.CV_64F).var()),
+            'width': image.shape[1], 'height': image.shape[0],
+            **detection,
+        })
 
     def voice(self, payload: bytes) -> EmbeddingResult:
-        rate, signal = _decode_audio(payload)
+        rate, raw_signal = _decode_audio(payload, normalize_peak=False)
+        signal = raw_signal / max(float(np.max(np.abs(raw_signal))), 1e-8)
         quality = _voice_quality(signal, rate)
         if quality < 0.15:
             raise BiometricError("Audio không đủ chất lượng")
@@ -131,7 +140,14 @@ class BiometricEngine:
                 features.extend([float(np.mean(spectrum)), float(np.std(spectrum)), float(np.max(spectrum))])
             embedding = np.asarray(features, dtype=np.float32)
             backend = "demo-spectrum"
-        return EmbeddingResult(normalize(embedding), quality, backend)
+        original_rate, _ = wavfile.read(io.BytesIO(payload))
+        return EmbeddingResult(normalize(embedding), quality, backend, {
+            'quality': quality, 'duration': len(raw_signal) / rate,
+            'rms': float(np.sqrt(np.mean(raw_signal ** 2))),
+            'clipping_ratio': float(np.mean(np.abs(raw_signal) >= .99)),
+            'silence_ratio': float(np.mean(np.abs(raw_signal) < .005)),
+            'sample_rate': original_rate,
+        })
 
     def _load_sface(self) -> None:
         detector_path = self.model_dir / "face_detection_yunet_2023mar.onnx"
@@ -141,7 +157,7 @@ class BiometricEngine:
         self._face_detector = cv2.FaceDetectorYN.create(str(detector_path), "", (320, 320), 0.8, 0.3, 5000)
         self._face_recognizer = cv2.FaceRecognizerSF.create(str(recognizer_path), "")
 
-    def _sface(self, image: np.ndarray) -> np.ndarray:
+    def _sface(self, image: np.ndarray, with_metadata=False):
         with self._lock:
             if self._face_detector is None:
                 self._load_sface()
@@ -153,7 +169,11 @@ class BiometricEngine:
                 raise BiometricError(f"Cần đúng một khuôn mặt; phát hiện {count}",
                                      "multiple_faces" if count > 1 else "no_face")
             aligned = self._face_recognizer.alignCrop(image, faces[0])
-            return self._face_recognizer.feature(aligned).reshape(-1)
+            embedding = self._face_recognizer.feature(aligned).reshape(-1)
+            if with_metadata:
+                return embedding, {'detection_confidence': float(faces[0][-1]),
+                                   'face_size_ratio': float(faces[0][2] * faces[0][3] / (width * height))}
+            return embedding
 
     def _ecapa(self, signal: np.ndarray) -> np.ndarray:
         with self._lock:

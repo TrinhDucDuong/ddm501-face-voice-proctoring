@@ -21,9 +21,11 @@ def identity_split(rows: list[dict], folds: int = 5) -> dict:
 
 
 def manifest_for_snapshot(snapshot: dict) -> dict:
+    reviewed = sum(str(row['id']).startswith('reviewed-') for row in snapshot['samples'])
     return {'schema_version': 1, 'dataset_version': snapshot['dataset_version'],
             'tenant_scope': snapshot['tenant_scope'], 'sample_count': len(snapshot['samples']),
-            'label_provenance': 'enrollment_identity_only', 'contains_raw_media': False,
+            'label_provenance': 'enrollment_and_human_random_audit' if reviewed else 'enrollment_identity_only',
+            **({'reviewed_samples': reviewed} if reviewed else {}), 'contains_raw_media': False,
             'split': identity_split(snapshot['samples'])}
 
 

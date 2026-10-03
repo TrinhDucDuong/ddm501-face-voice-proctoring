@@ -45,6 +45,7 @@ class VerificationOut(BaseModel):
     model_version: str
     latency_ms: int
     explanations: dict = Field(default_factory=dict)
+    model_versions: dict[str, str] = Field(default_factory=dict)
 
 
 class SimulationIn(BaseModel):
