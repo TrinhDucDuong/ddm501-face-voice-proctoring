@@ -1,0 +1,682 @@
+{
+  "uid": "biometric-simulation",
+  "title": "DDM501 - SYNTHETIC Simulation Evidence",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "refresh": "15s",
+  "timezone": "browser",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Synthetic results / alert delivery / reset",
+      "type": "stat",
+      "description": "SYNTHETIC LAB ONLY. Latest run per scenario/modality, retained after reset. Result: 0=in progress, 1=promoted, 2=rolled back, 3=failed, 4=reset before result. Alert/reset: 1=yes, 0=no.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "simulation_evidence_result{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\"}",
+          "legendFormat": "{{modality}} / {{scenario}} result",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "B",
+          "expr": "simulation_evidence_alert_received{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\"}",
+          "legendFormat": "{{modality}} / {{scenario}} alert received",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "C",
+          "expr": "simulation_evidence_baseline_restored{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\"}",
+          "legendFormat": "{{modality}} / {{scenario}} baseline restored",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No evidence yet",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "In progress"
+                      },
+                      "1": {
+                        "text": "Promoted"
+                      },
+                      "2": {
+                        "text": "Rolled back"
+                      },
+                      "3": {
+                        "text": "Failed"
+                      },
+                      "4": {
+                        "text": "Reset early"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "graphMode": "none",
+        "colorMode": "none"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Evidence run started at (check freshness)",
+      "type": "stat",
+      "description": "SYNTHETIC LAB ONLY. Latest run per scenario/modality, retained after reset. Snapshot values are not new production traffic on every scrape.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "simulation_evidence_started_unixtime{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\"} * 1000",
+          "legendFormat": "{{modality}} / {{scenario}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsLocal",
+          "noValue": "No evidence yet",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Drift: healthy baseline vs final drift window",
+      "type": "bargauge",
+      "description": "SYNTHETIC LAB ONLY. Latest run per scenario/modality, retained after reset. W0=healthy baseline; W3=final drift window. Quality/score PSI threshold=0.2; embedding MMD2 threshold=0.02.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "simulation_evidence_drift{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\",window=~\"0|3\"}",
+          "legendFormat": "W{{window}} {{kind}} / {{modality}} / {{scenario}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No evidence yet",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Genuine / impostor cosine scores",
+      "type": "bargauge",
+      "description": "SYNTHETIC LAB ONLY. Latest run per scenario/modality, retained after reset. Synthetic labelled distributions. Baseline policy threshold=0.8.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 9,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "simulation_evidence_score_mean{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\"}",
+          "legendFormat": "W{{window}} {{kind}} / {{modality}} / {{scenario}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No evidence yet",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Persistence and retrain decision",
+      "type": "bargauge",
+      "description": "SYNTHETIC LAB ONLY. Latest run per scenario/modality, retained after reset. Three independent drift windows required; retrain required 1=yes, 0=no.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "simulation_evidence_persistent_windows{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\"}",
+          "legendFormat": "W{{window}} persistence / {{modality}} / {{scenario}}",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "B",
+          "expr": "simulation_evidence_retrain_required{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\"}",
+          "legendFormat": "W{{window}} retrain / {{modality}} / {{scenario}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No evidence yet",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Offline comparison on identical holdout",
+      "type": "bargauge",
+      "description": "SYNTHETIC LAB ONLY. Latest run per scenario/modality, retained after reset. Synthetic FMR/FNMR/EER, not human-reviewed production accuracy.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "simulation_evidence_performance{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\",phase=\"offline\"}",
+          "legendFormat": "{{metric}} {{role}} / {{modality}} / {{scenario}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "No evidence yet",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "title": "Shadow / canary / post-rollout HTTP samples",
+      "type": "bargauge",
+      "description": "SYNTHETIC LAB ONLY. Latest run per scenario/modality, retained after reset. Shadow must serve zero candidate responses. Rollback probe must also serve zero candidate responses.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "simulation_evidence_stage_samples{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\"}",
+          "legendFormat": "{{phase}} all / {{modality}} / {{scenario}}",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "B",
+          "expr": "simulation_evidence_stage_served_candidate{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\"}",
+          "legendFormat": "{{phase}} candidate / {{modality}} / {{scenario}}",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "C",
+          "expr": "simulation_evidence_probe_samples{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\"}",
+          "legendFormat": "{{probe}} all / {{modality}} / {{scenario}}",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "D",
+          "expr": "simulation_evidence_probe_candidate_samples{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\"}",
+          "legendFormat": "{{probe}} candidate / {{modality}} / {{scenario}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No evidence yet",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "title": "Challenger stage security and rejection rates",
+      "type": "bargauge",
+      "description": "SYNTHETIC LAB ONLY. Latest run per scenario/modality, retained after reset. Rollback scenario injects impostors at CANARY_25. No CANARY_50/100 evidence is expected after failure.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 27,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "simulation_evidence_performance{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\",phase!=\"offline\",role=\"candidate\",metric=~\"fmr|fnmr\"}",
+          "legendFormat": "{{metric}} {{phase}} / {{modality}} / {{scenario}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "No evidence yet",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "title": "Measured policy latency p95",
+      "type": "bargauge",
+      "description": "SYNTHETIC LAB ONLY. Latest run per scenario/modality, retained after reset. Policy routing/comparison time only; does not include pretrained encoder or network latency. Limit=10ms.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "simulation_evidence_policy_latency_p95_ms{job=\"simulation\",synthetic=\"true\",scenario=~\"$scenario\",modality=~\"$modality\"}",
+          "legendFormat": "{{phase}} / {{modality}} / {{scenario}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "noValue": "No evidence yet",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Live canary / retrain - all scenarios",
+      "type": "timeseries",
+      "description": "SYNTHETIC LAB ONLY. Latest run per scenario/modality, retained after reset. Live current run only; scenario filter does not apply. Reset returns both signals to zero. Short stages may fall between 15s scrapes; stage evidence above is authoritative.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 36,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "simulation_canary_percent{job=\"simulation\",synthetic=\"true\",modality=~\"$modality\"}",
+          "legendFormat": "{{modality}} canary %",
+          "instant": false,
+          "range": true
+        },
+        {
+          "refId": "B",
+          "expr": "max by (modality) (simulation_retrain_required{job=\"simulation\",synthetic=\"true\",modality=~\"$modality\"})",
+          "legendFormat": "{{modality}} retrain alert",
+          "instant": false,
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No evidence yet",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    }
+  ],
+  "tags": [
+    "ddm501",
+    "simulation",
+    "synthetic"
+  ],
+  "description": "Isolated synthetic embeddings and labels. Actual Airflow, alerts, HTTP routing and MLflow policy gates. Not production biometric accuracy.",
+  "templating": {
+    "list": [
+      {
+        "name": "scenario",
+        "label": "Scenario",
+        "type": "custom",
+        "query": "promotion,rollback",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "current": {
+          "text": "promotion",
+          "value": "promotion"
+        }
+      },
+      {
+        "name": "modality",
+        "label": "Modality",
+        "type": "custom",
+        "query": "face,voice",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "current": {
+          "text": "voice",
+          "value": "voice"
+        }
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "Production overview",
+      "url": "/d/biometric-overview",
+      "type": "link"
+    },
+    {
+      "title": "Simulation controls",
+      "url": "http://localhost:18501",
+      "type": "link"
+    },
+    {
+      "title": "Simulation MLflow",
+      "url": "http://localhost:15031",
+      "type": "link"
+    }
+  ]
+}

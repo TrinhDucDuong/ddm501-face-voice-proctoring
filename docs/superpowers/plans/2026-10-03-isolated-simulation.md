@@ -1,3 +1,6 @@
+> HISTORICAL PLAN / SPEC: retained for design history, not current runtime status.
+> See [current documentation](../../README.md) for implementation, commands and evidence.
+
 # Isolated lifecycle simulation implementation plan
 
 Approved scope: the conversation's two scenarios and baseline reset, with no

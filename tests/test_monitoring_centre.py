@@ -105,15 +105,23 @@ def test_fairness_requires_both_classes_and_reports_uncertainty():
     assert build_report(rows)['gate'] == 'insufficient_data'
 
 
-def test_grafana_queue_and_panels_have_correct_sources_and_layout():
+def test_grafana_overview_has_correct_sources_and_layout():
     dashboard = build()
-    queue = next(p for p in dashboard['panels'] if p['title'].startswith('Review queue'))
-    sql = queue['targets'][0]['rawSql']
-    assert "s.status='review'" in sql and 'accepted = false' not in sql
-    assert any(p.get('datasource',{}).get('uid') == 'loki' for p in dashboard['panels'])
+    assert dashboard['uid'] == 'biometric-overview'
+    assert len(dashboard['panels']) == 10
+    assert [v['name'] for v in dashboard['templating']['list']] == ['project']
+    assert all(p['datasource']['uid'] == 'prometheus' for p in dashboard['panels'])
+    traffic = next(p for p in dashboard['panels'] if p['title'] == 'API traffic')
+    assert 'biometric_requests_total' in traffic['targets'][0]['expr']
+    assert '/v1/simulation.*' in traffic['targets'][0]['expr']
+    assert 'biometric_verifications_total' not in traffic['targets'][0]['expr']
+    quality = next(p for p in dashboard['panels'] if p['title'].startswith('Human-reviewed quality'))
+    assert all('source="human"' in t['expr'] for t in quality['targets'])
+    assert 'biometric_reviewed_report_success' in quality['targets'][0]['expr']
     assert len({p['id'] for p in dashboard['panels']}) == len(dashboard['panels'])
-    for i,first in enumerate(dashboard['panels']):
+    for i, first in enumerate(dashboard['panels']):
         a = first['gridPos']
+        assert 0 <= a['x'] < a['x'] + a['w'] <= 24 and a['h'] > 0
         for second in dashboard['panels'][i+1:]:
             b = second['gridPos']
             assert not (a['x'] < b['x']+b['w'] and b['x'] < a['x']+a['w'] and a['y'] < b['y']+b['h'] and b['y'] < a['y']+a['h'])

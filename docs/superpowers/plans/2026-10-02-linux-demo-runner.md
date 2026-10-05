@@ -1,3 +1,6 @@
+> HISTORICAL PLAN / SPEC: retained for design history, not current runtime status.
+> See [current documentation](../../README.md) for implementation, commands and evidence.
+
 # Linux demo runner implementation plan
 
 **Goal:** Run `deploy-demo` on this machine without executing the Windows runner binary blocked by Code Integrity.

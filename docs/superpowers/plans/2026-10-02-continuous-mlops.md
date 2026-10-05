@@ -1,3 +1,6 @@
+> HISTORICAL PLAN / SPEC: retained for design history, not current runtime status.
+> See [current documentation](../../README.md) for implementation, commands and evidence.
+
 # Continuous MLOps Implementation Plan
 
 **Goal:** Turn production drift and reviewed outcomes into versioned monitoring evidence, safe candidate evaluation, and controlled champion deployment.

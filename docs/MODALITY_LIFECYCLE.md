@@ -46,6 +46,10 @@ The target of 50,000 employees is a design target, not a measured capacity resul
 - Template age: time since active template creation, or most recent original
   enrollment sample; buckets <=30, <=90, <=180, <=365, >365 days. Reports contain
   sample counts, genuine mean, FNMR/FMR and quality mean by bucket.
+  The aging heuristic compares the first (<=30 days) and last (>365 days)
+  buckets: recent FNMR <=0.05, oldest FNMR >0.07 and overall FMR <=0.01.
+  This is not a fitted age/performance correlation or proof that every
+  intermediate cohort is healthy; sparse or missing extreme cohorts limit it.
 
 ## Configuration
 
@@ -89,6 +93,13 @@ champion, so a model rollout cannot silently change its template cohort mid-stag
 Persistent embedding AND score drift AND verified performance degradation across
 at least two age cohorts -> RETRAIN_REQUIRED. Otherwise monitor/score/embedding
 states describe the unresolved evidence. Rules suggest causes, not causal proof.
+
+With only 100 eligible observations and no existing frozen reference, the
+default lifecycle cannot compare reference/current: it needs 100 + 100
+non-overlapping observations. After a reference exists, a further 100 current
+observations can support one comparison if labels/vectors/cohorts also pass.
+Three fresh qualifying current windows, not three polls of those 100 rows,
+are required for persistence.
 
 Count a new persistence window only after at least one full window of new
 observation IDs since the last counted window. Refreshing labels or polling the
@@ -195,7 +206,10 @@ Template rollback is explicit; subsequent template-specific automatic rollback i
 not implemented. Reference renewal remains an operator action.
 
 Prometheus contains modality, kind, class and bounded state labels, no employee IDs,
-raw media or vector labels. Grafana adds independent lifecycle panels. Existing
+raw media or vector labels. The compact Grafana overview includes modality drift
+and deployment/freshness panels; further metrics are available in Explore.
+The separate ten-panel simulation dashboard displays synthetic lifecycle evidence.
+See [monitoring mapping](../MONITORING_MAPPING.md). Existing
 60-second Evidently monitoring remains the operational dashboard/report loop; it
 does not independently trigger training. Automation decisions come from the hourly
 Airflow job. GitHub Actions/Docker Compose remain the code/image deployment path.
@@ -205,13 +219,15 @@ Airflow job. GitHub Actions/Docker Compose remain the code/image deployment path
 Tests cover drift decisions/persistence, real API shadow capture, template poisoning
 and rollback, actual local MLflow aliases, live-policy state progression, canary
 failure, independent Face/Voice state, migration, retention and aggregate metrics.
-Test observations and labels are synthetic fixtures. No fresh production shadow,
+Test observations and labels are synthetic fixtures. The DAG generates a RAI report, but the modality candidate endpoint does not
+enforce the legacy `REQUIRE_HUMAN_FAIRNESS` flag; see [RAI](../RESPONSIBLE_AI.md).
+No fresh production shadow,
 canary, template activation or new human benchmark was executed by these tests.
 PostgreSQL locking behavior and a 50,000-employee concurrent deployment still need
 load/concurrency validation against a staging environment. This is not a claim of
 production readiness, demographic fairness, liveness accuracy or encoder retraining.
 
-## Changed Files And Tests
+## Source Map And Tests
 
 - Serving and persistence: `api/app/{biometrics,checks,config,main,models,schemas}.py`;
   new `observation.py`, `lifecycle_api.py`, `lifecycle_service.py`,
@@ -222,9 +238,9 @@ production readiness, demographic fairness, liveness accuracy or encoder retrain
   `model_rollout.py`, `monitoring_job.py`, `verify_stack.py` and both existing DAGs.
 - Monitoring: `monitoring/ops_monitor.py`, `monitoring/prometheus/alerts.yml`,
   `pipeline/build_dashboard.py` and its generated Grafana dashboard.
-- Configuration/documentation: `.env.example`, `README.md`, `VERIFICATION.md`,
+- Configuration/documentation: `.env.example`, `README.md`, [dated evidence](EVIDENCE.md),
   `docs/CONTINUOUS_MLOPS.md`, this document and the implementation plan.
-  `docs/DEMO_HANDOVER_GUIDE.md` now distinguishes historical DAG runs from the new schedule.
+  `docs/DEMO_HANDOVER_GUIDE.md` links to current operator and demo runbooks.
 - New suites: `test_drift_decision.py`, `test_live_lifecycle.py`,
   `test_template_lifecycle.py`, `test_lifecycle_monitoring.py`,
   `test_lifecycle_registry_integration.py`. Existing API, collector, immutable

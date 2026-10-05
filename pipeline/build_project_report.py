@@ -28,12 +28,13 @@ def main():
         else:
             story.append(Paragraph(escape(line), normal))
     story.append(Spacer(1, .3*cm))
-    destination = ROOT/'docs/DDM501_Project_Report.pdf'
+    destination = ROOT/'reports/DDM501_Project_Report.pdf'
+    destination.parent.mkdir(parents=True, exist_ok=True)
     doc = SimpleDocTemplate(str(destination), title='DDM501 Face & Voice Integrity Service',
                             author='DDM501 project', leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
     def footer(canvas, document):
         canvas.setFont(font, 8)
-        canvas.drawString(2*cm, cm, 'DDM501 | MVP tích hợp doanh nghiệp | 29/09/2026')
+        canvas.drawString(2*cm, cm, 'DDM501 | Face & Voice Integrity | Source: PROJECT_REPORT.md')
         canvas.drawRightString(document.pagesize[0]-2*cm, cm, str(document.page))
     doc.build(story, onFirstPage=footer, onLaterPages=footer)
     print(destination)

@@ -7,7 +7,7 @@ template safeguards, registry transitions, tests and limitations.
 
 This replaces the previous two-window PSI trigger and direct joint-bundle promotion.
 Existing runtime/CI evidence is historical unless its tested revision includes this
-change; see [VERIFICATION.md](../VERIFICATION.md).
+change; see [EVIDENCE](EVIDENCE.md).
 
 ## One Automation Path
 
@@ -68,7 +68,6 @@ does not measure a separate encoder: champion and challenger share the encoder.
 50,000-employee throughput, PostgreSQL concurrency and production cohort quality
 still require staging validation. See the lifecycle document before activation.
 
-Historical checkpoint before the earlier continuous-MLOps implementation:
-`checkpoint/2026-10-02-before-mlops-continuous`, commit `4913b7b`. The recorded restore
-exercise used `data/backups/ddm501_restore_drill_20261001_184709.dump` (gitignored).
-A source rollback does not restore DB/MinIO data; preserve subsequent data separately.
+Historical checkpoints and restore notes are indexed in
+[archive](archive/README.md). A source rollback does not restore DB/MinIO data;
+use the [current deployment recovery guidance](../DEPLOYMENT.md#backup-restore-và-rollback).

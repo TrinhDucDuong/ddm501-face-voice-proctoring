@@ -1,0 +1,117 @@
+---
+title: Face & Voice Integrity - Current High-Level Architecture
+---
+%% Source baseline: da1fc4ee8292aec9bb2d04cb982ba4aeeb9fa569 (2026-10-02).
+%% IMPLEMENTED describes source/configuration, not a live production certification.
+%% Metrics arrows show information flow; Prometheus actively scrapes exporters.
+%% Face and voice run inside FastAPI. MLflow states are not separate model servers.
+%%{init: {"theme":"base","themeVariables":{"fontFamily":"Segoe UI, sans-serif","fontSize":"18px","lineColor":"#64748b","primaryTextColor":"#172b4d","clusterBkg":"#f8fafc","clusterBorder":"#94a3b8","edgeLabelBackground":"#ffffff"},"flowchart":{"curve":"basis","nodeSpacing":24,"rankSpacing":30,"htmlLabels":true}}}%%
+flowchart TB
+    subgraph CLIENT["1 | CLIENTS & HUMAN REVIEW"]
+        direction LR
+        CUSTOMER["Company exam backend<br/>Bundled demo client"]
+        PORTAL["Company portal<br/>Streamlit"]
+        REVIEW["Human review<br/>Concerns + 10% audit cohort"]
+        PORTAL --> REVIEW
+    end
+
+    subgraph SERVE["2 | APPLICATION & SERVING"]
+        direction LR
+        API["FastAPI<br/>Enrollment / batch checks"]
+        FACE["Face verification<br/>YuNet / SFace + MiniFASNet"]
+        VOICE["Voice verification<br/>ECAPA + AASIST"]
+        POLICY["Production decision<br/>Loaded champion thresholds"]
+        WEBHOOK["Webhook worker<br/>HMAC / durable retry"]
+        API --> FACE --> POLICY
+        API --> VOICE --> POLICY
+        POLICY -->|"SQL outbox"| WEBHOOK
+    end
+
+    subgraph DATA["3 | DATA & STORAGE"]
+        direction LR
+        PG[("PostgreSQL<br/>Embeddings / checks / labels<br/>Outbox / audit / metadata")]
+        MINIO[("MinIO<br/>Evidence / dataset manifests<br/>MLflow artifacts")]
+        FILES["Mounted files<br/>Pinned weights / snapshots<br/>Reports / logs"]
+        PG ~~~ MINIO ~~~ FILES
+    end
+
+    subgraph MLOPS["4 | AIRFLOW & MLFLOW - MODEL RELEASE"]
+        direction LR
+        MON["Monitoring DAG - hourly<br/>Windows / PSI / audit FAR-FRR"]
+        TRAIN["Model DAG - weekly or triggered<br/>Snapshot / validate / publish<br/>Calibrate / CV / holdout"]
+        CAND["MLflow tracking & registry<br/>Candidate = challenger"]
+        GATE["Promotion gate<br/>RAI / paired holdout<br/>Reviewed score replay"]
+        CHAMP["MLflow champion<br/>Target production policy"]
+        ROLLOUT["Reload + readiness<br/>30-second observation<br/>Restore previous on failure"]
+        PREV["Previous version<br/>rollback_version tag"]
+        CANARY["PLANNED<br/>Live traffic canary"]
+        MON ==>|"eligible demo data only"| TRAIN
+        TRAIN ==> CAND ==> GATE
+        GATE ==>|"pass only"| CHAMP ==> ROLLOUT
+        CHAMP -->|"retain predecessor"| PREV
+        PREV -->|"rollback target"| ROLLOUT
+        CAND -.-> CANARY
+    end
+
+    subgraph OPS["5 | MONITORING & ALERTING"]
+        direction LR
+        COLLECT["Drift / ops monitors<br/>Evidently + metrics"]
+        PROM["Prometheus<br/>Scrapes / alert rules"]
+        GRAFANA["Grafana + report gateway<br/>Metrics / SQL / logs"]
+        LOGS["Docker proxy / Alloy / Loki<br/>Container logs"]
+        ALERT["Alertmanager"]
+        TG["Ops alert bridge -> Telegram<br/>Configured platform alerts"]
+        COLLECT --> PROM --> GRAFANA
+        PROM --> ALERT --> TG
+        LOGS --> GRAFANA
+    end
+
+    subgraph CICD["6 | CI/CD - CODE RELEASE"]
+        direction LR
+        GIT["Developer / GitHub<br/>Push / PR / dispatch"]
+        CI["GitHub Actions - Ubuntu<br/>Quality tests / image builds"]
+        RUNNER["Self-hosted Linux / WSL<br/>Trusted main deploy job"]
+        DEPLOY["PowerShell -> Docker Desktop<br/>Stage SHA / rebuild Compose<br/>PARTIAL: current run unverified"]
+        GIT --> CI --> RUNNER
+        RUNNER -.->|"execution unverified"| DEPLOY
+    end
+
+    CLIENT <-->|"image + WAV / results / callbacks"| SERVE
+    SERVE <-->|"references / checks / evidence / outbox"| DATA
+    CLIENT ==>|"human labels via API"| DATA
+    DATA <==>|"checks / labels / datasets / artifacts"| MLOPS
+    MLOPS ==>|"champion reload / health rollback"| SERVE
+    DATA -->|"events / feedback"| OPS
+    SERVE -->|"metrics / container logs"| OPS
+    MLOPS -->|"PSI / recommendation / lifecycle state"| OPS
+    CICD -.->|"code + images; current run unverified"| SERVE
+    LEGEND["LEGEND<br/>Solid: implemented flow<br/>Dashed: partial / planned<br/>Bold: feedback / model release"]
+    OPS ~~~ LEGEND
+
+    classDef client fill:#f1f5f9,stroke:#64748b,color:#172b4d;
+    classDef app fill:#e0f2fe,stroke:#0284c7,color:#0c4a6e;
+    classDef data fill:#fef3c7,stroke:#d97706,color:#78350f;
+    classDef ml fill:#dcfce7,stroke:#16a34a,color:#14532d;
+    classDef champion fill:#166534,stroke:#14532d,color:#ffffff,stroke-width:3px;
+    classDef monitor fill:#ccfbf1,stroke:#0f766e,color:#134e4a;
+    classDef human fill:#ffe4e6,stroke:#e11d48,color:#881337;
+    classDef ci fill:#e0e7ff,stroke:#4f46e5,color:#312e81;
+    classDef partial fill:#fff7ed,stroke:#c2410c,color:#7c2d12,stroke-dasharray:6 4;
+    classDef planned fill:#f8fafc,stroke:#64748b,color:#475569,stroke-dasharray:6 4;
+    class CUSTOMER,LEGEND client;
+    class API,FACE,VOICE,POLICY,WEBHOOK app;
+    class PG,MINIO,FILES data;
+    class MON,TRAIN,CAND,GATE,ROLLOUT,PREV ml;
+    class CHAMP champion;
+    class COLLECT,PROM,GRAFANA,LOGS,ALERT,TG monitor;
+    class PORTAL,REVIEW human;
+    class GIT,CI,RUNNER ci;
+    class DEPLOY partial;
+    class CANARY planned;
+    style CLIENT fill:#fff8f8,stroke:#fda4af
+    style SERVE fill:#f0f9ff,stroke:#7dd3fc
+    style DATA fill:#fffbeb,stroke:#fcd34d
+    style MLOPS fill:#f0fdf4,stroke:#86efac
+    style OPS fill:#f0fdfa,stroke:#5eead4
+    style CICD fill:#eef2ff,stroke:#a5b4fc
+    style LEGEND fill:#ffffff,stroke:#cbd5e1

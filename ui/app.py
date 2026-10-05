@@ -323,11 +323,17 @@ try:
         render(api)
 
     elif page == 'Vận hành MLOps':
-        st.link_button('Grafana Monitoring Centre', 'http://localhost:13000/d/biometric-overview', type='primary')
+        st.link_button('Grafana System Overview', 'http://localhost:13000/d/biometric-overview', type='primary')
         st.caption('Grafana/Evidently/Telegram phục vụ đội vận hành nền tảng. Công ty nhận kết quả nghiệp vụ qua API/webhook.')
-        for label, url in {'Airflow': 'http://localhost:18081', 'MLflow': 'http://localhost:15030', 'MinIO': 'http://localhost:19101',
+        st.caption('MLflow production chứa policy phục vụ Face/Voice. Model của ba nút demo nằm trong MLflow simulation riêng.')
+        for label, url in {'Airflow': 'http://localhost:18081',
+                            'Airflow monitoring': 'http://localhost:18081/dags/biometric_monitoring_pipeline/grid',
+                            'Airflow retraining': 'http://localhost:18081/dags/biometric_model_pipeline/grid',
+                            'Airflow simulation': 'http://localhost:18081/dags/biometric_simulation/grid',
+                            'MLflow production': 'http://localhost:15030', 'MLflow simulation': 'http://localhost:15031',
+                            'MinIO': 'http://localhost:19101',
                             'API docs': 'http://localhost:18100/docs', 'Customer demo': 'http://localhost:18600',
-                            'CI/CD': 'https://github.com/TrinhDucDuong/ddm501-face-voice-proctoring/actions'}.items():
+                            'CI/CD': 'https://github.com/FSB-MSA36HN/DDM501-face-voice-proctoring/actions'}.items():
             st.link_button(label, url)
         if st.button('Reload champion model'):
             result = api('POST', '/v1/admin/reload-model')

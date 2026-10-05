@@ -22,6 +22,19 @@ EXPECTED_MODEL_TASK_IDS = {
 }
 
 
+def validate_grafana_dashboard(dashboard):
+    path = Path(__file__).resolve().parents[1] / 'monitoring/grafana/dashboards/biometric-overview.json'
+    expected = json.loads(path.read_text(encoding='utf-8'))
+    assert dashboard.get('uid') == expected['uid'], 'Unexpected dashboard UID'
+    # Grafana adds server metadata; compare only the provisioned panel contract.
+    def panels(value):
+        return [{key: panel.get(key) for key in ('id', 'title', 'type', 'datasource', 'targets', 'gridPos')}
+                for panel in value.get('panels', [])]
+    assert panels(dashboard) == panels(expected), 'Served dashboard differs from this checkout'
+    assert dashboard.get('links') == expected.get('links'), 'Served dashboard links differ from this checkout'
+    return [panel['title'] for panel in dashboard['panels']]
+
+
 def validate_served_versions(result, health, deployments):
     if not health.get('modality_champions'):
         assert result['model_version'] == health['model_version']
@@ -135,9 +148,7 @@ def main() -> None:
         base = "http://127.0.0.1:13000"
         assert get(base + "/api/health")["database"] == "ok"
         dashboard = get(base + "/api/dashboards/uid/biometric-overview", auth=("admin", "admin"))["dashboard"]
-        panels = [panel["title"] for panel in dashboard["panels"]]
-        assert any("Human Evidently performance" in title for title in panels), panels
-        return panels
+        return validate_grafana_dashboard(dashboard)
 
     def alerts():
         prom = get(prometheus + "/api/v1/alerts")["data"]["alerts"]

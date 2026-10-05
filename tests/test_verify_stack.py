@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from pipeline import verify_stack
+from pipeline.build_dashboard import build
 
 TASK_IDS = [
     'ingest_versioned_snapshot',
@@ -17,6 +18,21 @@ TASK_IDS = [
     'evaluate_and_promote_candidate',
     'reload_current_champion',
 ]
+
+
+def test_grafana_verification_accepts_compact_dashboard_and_rejects_stale_queries():
+    dashboard = build()
+    assert len(verify_stack.validate_grafana_dashboard(dashboard)) == 10
+    dashboard['panels'][0]['targets'][0]['expr'] = 'up'
+    with pytest.raises(AssertionError, match='dashboard'):
+        verify_stack.validate_grafana_dashboard(dashboard)
+
+
+def test_grafana_verification_rejects_missing_panel():
+    dashboard = build()
+    dashboard['panels'].pop()
+    with pytest.raises(AssertionError, match='dashboard'):
+        verify_stack.validate_grafana_dashboard(dashboard)
 
 
 def test_inference_version_validation_accepts_only_routed_canary_versions():

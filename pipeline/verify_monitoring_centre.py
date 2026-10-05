@@ -9,6 +9,11 @@ from pathlib import Path
 
 import requests
 
+if __package__:
+    from .verify_stack import validate_grafana_dashboard
+else:
+    from verify_stack import validate_grafana_dashboard
+
 
 def verify(send_alert=False):
     session = requests.Session()
@@ -115,6 +120,7 @@ def verify(send_alert=False):
             time.sleep(2)
         raise AssertionError('Alertmanager test notification not delivered within 100 seconds')
 
+    check('provisioned_dashboard_revision', lambda: validate_grafana_dashboard(dashboard))
     check('all_dashboard_queries', queries)
     check('collector_and_container_freshness', collectors)
     check('protected_reports_and_sources', reports)

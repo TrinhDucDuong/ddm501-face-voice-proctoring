@@ -12,6 +12,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field, FiniteFloat
 
+from pipeline.simulation_metrics import evidence_metrics
 from pipeline.simulation_runner import SimulationRunner
 
 
@@ -134,7 +135,7 @@ def create_app(root, key, stage_seconds=5, verify_url=None):
             lines.append(f'simulation_retrain_required{{modality="{modality}",synthetic="true",run_id="{run_id}"}} {value}')
             percent = state.get('deployment', {}).get('traffic_percent', 0) if selected else 0
             lines.append(f'simulation_canary_percent{{modality="{modality}",synthetic="true"}} {percent}')
-        return Response('\n'.join(lines) + '\n', media_type='text/plain')
+        return Response('\n'.join(lines) + '\n' + evidence_metrics(runner), media_type='text/plain')
 
     return app
 

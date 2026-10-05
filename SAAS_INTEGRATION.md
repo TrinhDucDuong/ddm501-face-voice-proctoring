@@ -5,10 +5,10 @@
 Customer owns exam login, capture cadence, scoring and business decisions. Service owns employees/enrollment, identity/integrity signals, history/evidence and callbacks. Company portal exposes its tenant only; Grafana/Evidently/Telegram are platform administration.
 
 1. POST /v1/registrations {name} creates simulated active company; operator_key returned once. Platform-admin tenant provisioning also remains available.
-2. Operator creates people and POST /v1/people/{id}/enroll with face_files/voice_files. At least 2 different images and WAVs recommended. Raw enrollment defaults off; embeddings/metadata remain.
+2. Operator creates people and POST /v1/people/{id}/enroll with face_files/voice_files. Use at least 2 distinct accepted images and 2 WAVs for enrollment readiness. Raw enrollment defaults off; embeddings/metadata remain.
 3. Operator POST /v1/company/keys issues integration key; GET lists key IDs, DELETE revokes only own keys. PATCH /v1/company sets webhook_url on approved host; GET provides signing secret to operator.
 4. Customer backend POST /v1/checks with X-API-Key integration credential and multipart person_id, session_id, request_id, consent=true, face_file, voice_file. session_id belongs to customer; new request_id for each capture, stable request_id for retry. Consent assertion must originate from an actual consented process.
-5. API returns check_id, employee code/name, checked_at, face_match/voice_match, scores, verified/suspicious/inconclusive, reason_codes/labels, capabilities, model_version and evidence_status.
+5. API returns check_id, employee code/name, checked_at, face_match/voice_match, scores, verified/suspicious/inconclusive, reason_codes/labels, capabilities, `model_versions` for independent policies, compatibility `model_version` and evidence_status.
 6. GET /v1/checks supports person_id/session_id/start/end/limit/offset. GET /v1/checks/{id} fetches canonical immutable result. Company decides consequences; no automatic exam admission contract in checks.
 7. Operator GET /v1/company/report[.csv|.pdf] exports same filtered history and employee/session first-last ranges. GET /v1/checks/{id}/evidence/face|voice streams protected evidence. No public S3 link/secret in report.
 

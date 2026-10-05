@@ -21,20 +21,23 @@ flowchart LR
     end
 
     subgraph ML["Vòng đời model — Airflow và MLflow"]
-        AIRFLOW["Training DAG<br/>hàng tuần / monitoring trigger"]
+        AIRFLOW["Training DAG theo yêu cầu<br/>Face hoặc Voice riêng"]
         SNAP["1. Snapshot có phiên bản<br/>fingerprint SHA-256"]
         DQ["2. Data quality gate<br/>kiểm tra mẫu và embedding"]
         LAKE["3. Dataset manifest + split<br/>MinIO SHA-256"]
         TRAIN["4. Feature pairs + calibration<br/>CV theo identity, holdout riêng"]
         CAND["MLflow candidate / challenger<br/>params, metrics, artifacts"]
         RAI["5. Responsible AI audit<br/>human/synthetic tách riêng"]
-        GATE["6. Promotion gate<br/>paired holdout + reviewed shadow"]
+        GATE["6. Offline gate<br/>cùng holdout với champion"]
         CHAMP["MLflow champion<br/>identity policy / thresholds"]
         KEEP["Không đạt gate<br/>giữ champion đang phục vụ"]
-        RELOAD["7. Reload champion + health soak<br/>lỗi thì rollback alias/version"]
+        TICK["7. Lifecycle tick<br/>state và audit trong PostgreSQL"]
+        SHADOW["Shadow<br/>chỉ champion trả kết quả"]
+        CANARY["Canary policy<br/>5 → 10 → 25 → 50 → 100%"]
+        TEMPLATE["Template update gate<br/>trusted samples + holdout<br/>version và rollback"]
         MONDAG["Monitoring DAG hàng giờ<br/>ETL theo tenant/model"]
         WINDOWS["Reference + current snapshot<br/>input không nhãn / human labels"]
-        DECIDE["PSI + FAR/FRR đủ mẫu<br/>2 cửa sổ drift / cooldown"]
+        DECIDE["Quality PSI + embedding MMD²<br/>score PSI + reviewed FMR/FNMR<br/>template aging + 3 cửa sổ"]
     end
 
     subgraph OPS["Monitoring và vận hành"]
@@ -53,7 +56,13 @@ flowchart LR
     end
 
     subgraph CD["CI/CD — triển khai nền tảng"]
-        CI["GitHub Actions + runner Windows<br/>quality → build → deploy"]
+        CI["Ubuntu quality + Windows preflight<br/>build → Linux WSL runner<br/>PowerShell → Docker Desktop"]
+    end
+    subgraph SIM["Simulation riêng — dữ liệu tổng hợp"]
+        SIMUI["Platform: promote / rollback / reset"]
+        SIMDAG["biometric_simulation<br/>poll queue mỗi phút"]
+        SIMSERVICE["Simulation HTTP service<br/>SQLite + MLflow riêng<br/>simulation-data volume"]
+        SIMALERT["Alertmanager simulation receiver<br/>không gửi Telegram"]
     end
     end
 
@@ -75,8 +84,17 @@ flowchart LR
     DECIDE -->|"Đủ bằng chứng + tenant được phép train"| AIRFLOW
     DECIDE -->|"Trạng thái / khuyến nghị"| OPM
     CAND -->|"Ghi artifacts"| S3
-    GATE -->|"Đạt"| CHAMP --> RELOAD --> API
+    GATE -->|"Đạt: challenger"| TICK --> SHADOW -->|"Đạt gate"| CANARY
+    CANARY -->|"Đạt stage cuối: PROMOTING"| CHAMP
+    CHAMP -->|"DB champion + previous_champion"| DB
+    DB -->|"Policy routing đã lưu"| API
+    CANARY -->|"Regression: về champion"| KEEP
+    SHADOW -->|"Không đạt"| KEEP
+    DECIDE -->|"Chỉ template cũ suy giảm"| TEMPLATE --> DB
     GATE -->|"Không đạt"| KEEP
+    SIMUI --> SIMDAG --> SIMSERVICE
+    PROM -->|"Scrape simulation metrics"| SIMSERVICE
+    ALERT -->|"Synthetic alert"| SIMALERT --> SIMSERVICE
 
     DB -->|"Event / feedback"| DRIFT
     DB -->|"Data quality"| OPM
@@ -91,19 +109,27 @@ flowchart LR
     PROM -->|"Scrape /metrics"| DRIFT
     PROM -->|"Scrape /metrics"| OPM
     GRAFANA -->|"Truy vấn metric"| PROM
-    GRAFANA -->|"SQL"| DB
-    GRAFANA -->|"Truy vấn log"| LOKI
+    GRAFANA -.->|"Explore SQL"| DB
+    GRAFANA -.->|"Explore logs"| LOKI
     GRAFANA --> GATEWAY
     REPORTS --> GATEWAY
     PROM -->|"Firing / resolved"| ALERT -->|"Webhook"| OPM --> TELEGRAM
     GRAFANA -->|"Theo dõi / điều tra"| OPERATOR
     TELEGRAM -->|"Cảnh báo để xử lý"| OPERATOR
-    OPERATOR -.->|"Có thể chạy DAG thủ công"| AIRFLOW
+    OPERATOR -.->|"Điều tra evidence và lifecycle state"| DECIDE
     CI -->|"Triển khai stack"| DV
 ```
 
 **Ranh giới nghiệp vụ:** công ty tự điều khiển lịch capture, bài thi, điểm và quyết định; DDM501 trả kết quả từng check ngay qua API và signed webhook. Portal chỉ hiển thị dữ liệu của công ty đó. Ảnh/audio của check thường không được lưu theo cấu hình mặc định; ảnh/audio nghi vấn được lưu làm bằng chứng trong MinIO.
 
-**Vòng MLOps chung:** bảy bước đánh số là bảy task của DAG `biometric_model_pipeline`. DAG `biometric_monitoring_pipeline` tạo cửa sổ không nhãn, nhãn human tách riêng, tính drift và tự yêu cầu training khi đủ điều kiện. Training mặc định chỉ dùng tenant `demo`; dữ liệu các công ty khách hàng không tự đưa vào training. Candidate/challenger được so với champion trên cùng holdout và nhãn audit; thiếu bằng chứng hoặc không cải thiện thì giữ champion. Sau promotion, lỗi readiness sẽ rollback. Đây là shadow offline và kiểm tra sức khỏe serving, chưa có canary định tuyến traffic. Airflow hiệu chỉnh **identity policy**; MiniFASNet/AASIST là detector nghiên cứu có trọng số đã pin, chưa có benchmark anti-spoof trên dữ liệu khách hàng.
+**Vòng MLOps:** bảy bước đánh số là bảy task của DAG `biometric_model_pipeline`, không có lịch train hàng tuần. Monitoring hàng giờ yêu cầu train riêng Face/Voice khi embedding và score drift kéo dài, performance có nhãn tin cậy suy giảm qua nhiều nhóm tuổi template, đủ ba cửa sổ mới và cooldown/dữ liệu mới. Quality drift hoặc thiếu nhãn không tự kích hoạt train; template cũ suy giảm riêng đi theo template update. Training mặc định chỉ dùng tenant `demo`. Airflow hiệu chỉnh **ngưỡng**, không fine-tune SFace/ECAPA hoặc các detector PAD/AASIST.
 
-**Phản hồi vận hành:** Prometheus **chủ động kéo** metric từ API, webhook worker, drift-monitor và ops-monitor. Grafana truy vấn Prometheus, PostgreSQL và Loki; Alertmanager gửi sự kiện đến ops-monitor để chuyển cảnh báo kỹ thuật qua Telegram. Monitoring DAG có thể tự trigger training sau hai cửa sổ drift khác nhau hoặc hiệu năng human audit giảm, nhưng promotion luôn qua gate. Công ty không dùng Telegram này để nhận kết quả check. Docker stats đi qua proxy và ops-monitor; bản Compose hiện không có `node_exporter`.
+**Triển khai policy:** offline so sánh trên cùng holdout; shadow trả kết quả champion; canary chọn policy thực bằng hash ổn định của cohort. Từng stage chờ đủ mẫu, thời gian và nhãn, kiểm tra FMR/FNMR, latency policy, disagreement và cohort chất lượng. Fail trả traffic về champion; pass stage cuối mới chuyển alias/DB champion và giữ phiên bản trước. Face/Voice có registry name, trạng thái và routing riêng. Đây là canary của threshold policy; deploy ứng dụng vẫn là thay container bằng Compose. Hai policy dùng chung embedding/score, không chạy hai encoder.
+
+**Phản hồi vận hành:** Prometheus kéo metric từ API, worker, drift-monitor, ops-monitor và simulation. Hai dashboard overview/simulation đều có 10 panel dùng Prometheus. PostgreSQL/Loki vẫn được provision cho Explore/điều tra; report chi tiết nằm sau Grafana gateway. Production alerts đi qua ops-monitor tới Telegram nếu cấu hình; simulation alerts đi vào receiver riêng. Vòng Evidently 60 giây phục vụ báo cáo, không tạo trigger train thứ hai. Docker stats đi qua proxy và ops-monitor.
+
+**Simulation:** ba nút dùng SQLite/MLflow/volume riêng, synthetic embeddings và nhãn, HTTP traffic và alert thật. Hai kịch bản minh họa promote hoặc fail tại canary 25%; reset phục hồi baseline demo và giữ audit. Host/Airflow dùng chung nên vẫn có thể tranh chấp tài nguyên. Không dùng kết quả này làm bằng chứng accuracy production.
+
+**Giới hạn:** PostgreSQL lưu JSON embeddings cho so khớp 1:1, không có vector DB. Retain query embeddings tắt mặc định nên MMD có thể thiếu dữ liệu. Máy mới thiếu incumbent chưa tự khởi tạo champion thật; `/health` khác `/ready`. Mục tiêu 50.000 nhân viên chưa có load benchmark.
+
+Xem [kiến trúc kỹ thuật](../ARCHITECTURE.md), [methods và thresholds](MODALITY_LIFECYCLE.md), [simulation](SIMULATION.md) và [setup](../README.md).

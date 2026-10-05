@@ -1,3 +1,6 @@
+> HISTORICAL PLAN / SPEC: retained for design history, not current runtime status.
+> See [current documentation](../../README.md) for implementation, commands and evidence.
+
 # Company verification service - approved scope
 
 The user approved this scope in the conversation on 29 September 2026 and requested implementation. The annual foreign-language examination belongs to the customer. This project supplies verification and integrity signals through API/webhooks, a tenant portal, and a course MLOps platform. Airflow orchestrates snapshots, validation, evaluation and model promotion; it does not run customer examinations.

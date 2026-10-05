@@ -6,6 +6,31 @@ import requests
 from streamlit.testing.v1 import AppTest
 
 
+def test_platform_monitoring_links_distinguish_production_and_simulation(monkeypatch):
+    def upstream(method, url, **kwargs):
+        if url.endswith('/v1/me'):
+            data = {'tenant_id': 'demo', 'role': 'platform'}
+        elif url.endswith('/v1/admin/tenants'):
+            data = [{'id': 'demo', 'name': 'Demo', 'active': True}]
+        else:
+            raise AssertionError(url)
+        return SimpleNamespace(ok=True, status_code=200, json=lambda: data)
+
+    monkeypatch.setattr(requests, 'request', upstream)
+    app = AppTest.from_file(str(Path(__file__).parents[1] / 'ui' / 'app.py'))
+    app.session_state['auth_key'] = 'test-platform'
+    app.session_state['auth_expires_at'] = 9999999999
+    app.run()
+    app.sidebar.radio[0].set_value('Vận hành MLOps').run()
+    assert not app.exception
+    links = {button.proto.label: button.proto.url for button in app.get('link_button')}
+    assert links['Grafana System Overview'] == 'http://localhost:13000/d/biometric-overview'
+    assert links['MLflow production'] == 'http://localhost:15030'
+    assert links['MLflow simulation'] == 'http://localhost:15031'
+    assert links['Airflow monitoring'] == 'http://localhost:18081/dags/biometric_monitoring_pipeline/grid'
+    assert links['CI/CD'] == 'https://github.com/FSB-MSA36HN/DDM501-face-voice-proctoring/actions'
+
+
 @pytest.mark.parametrize('role', ['operator', 'platform'])
 def test_portal_login_removes_key_widget_and_logout_clears_session(monkeypatch, role):
     def upstream(method, url, headers, **kwargs):

@@ -1,3 +1,6 @@
+> HISTORICAL PLAN / SPEC: retained for design history, not current runtime status.
+> See [current documentation](../README.md) for implementation, commands and evidence.
+
 # Employee enrollment and multi-company demo
 
 ## Scope

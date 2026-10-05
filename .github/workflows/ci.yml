@@ -26,6 +26,7 @@ jobs:
       - run: ruff check api pipeline monitoring tests legacy_demo
       - run: python -m compileall -q api pipeline monitoring airflow/dags ui legacy_demo
       - run: python pipeline/build_dashboard.py && git diff --exit-code monitoring/grafana/dashboards/biometric-overview.json
+      - run: python pipeline/build_simulation_dashboard.py && git diff --exit-code monitoring/grafana/dashboards/biometric-simulation.json
       - run: python -m pytest --cov=app --cov=pipeline.evaluation --cov=pipeline.data_snapshot --cov=pipeline.validate_data --cov=pipeline.promotion_gate --cov=pipeline.responsible_ai_report --cov=monitoring --cov-report=term-missing --cov-report=xml --junitxml=reports/tests.xml --cov-fail-under=80
       - uses: actions/upload-artifact@v4
         if: always()

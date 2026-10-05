@@ -74,6 +74,26 @@ def test_isolated_run_promotion_failure_reset_and_stale_requests(tmp_path):
     assert failed['deployment']['champion_version'] == failed['baseline_version']
     runner.reset()
     assert len(runner.status()['history']) == 2
+    from prometheus_client.parser import text_string_to_metric_families
+
+    from pipeline.simulation_metrics import evidence_metrics
+    samples = [s for family in text_string_to_metric_families(evidence_metrics(runner)) for s in family.samples]
+
+    def metric(name, **labels):
+        return [s.value for s in samples if s.name == name and all(s.labels.get(k) == v for k, v in labels.items())]
+
+    assert metric('simulation_evidence_result', scenario='promotion') == [1]
+    assert metric('simulation_evidence_result', scenario='rollback') == [2]
+    assert metric('simulation_evidence_performance', scenario='promotion', phase='offline', role='candidate', metric='fnmr') == [0]
+    assert metric('simulation_evidence_performance', scenario='rollback', phase='CANARY_25', role='candidate', metric='fmr') == [1]
+    assert metric('simulation_evidence_stage_samples', scenario='promotion', phase='CANARY_100') == [200]
+    assert metric('simulation_evidence_drift', scenario='promotion', kind='embedding', window='3')[0] > .02
+    assert metric('simulation_evidence_retrain_required', scenario='promotion', window='0') == [0]
+    assert metric('simulation_evidence_persistent_windows', scenario='promotion', window='3') == [3]
+    assert metric('simulation_evidence_baseline_restored', modality='face') == [1]
+    assert all(s.labels.get('synthetic') == 'true' for s in samples)
+    assert all(not {'employee_id', 'person_id', 'embedding', 'run_id'} & s.labels.keys() for s in samples)
+    assert evidence_metrics(SimulationRunner(tmp_path, stage_seconds=0)) == evidence_metrics(runner)
     third = runner.start('promotion', 'voice', 503)['id']
     runner.reset()
     with pytest.raises(ValueError, match='inactive'):
@@ -159,3 +179,32 @@ def test_reset_cancels_inflight_stage_and_preserves_evidence(tmp_path):
 
 
 from test_checks import checks_api  # noqa: E402, F401
+
+
+def test_simulation_metrics_do_not_invent_missing_evidence(tmp_path):
+    from pipeline.simulation_metrics import evidence_metrics
+    from pipeline.simulation_runner import SimulationRunner
+    runner = SimulationRunner(tmp_path, stage_seconds=0)
+    assert evidence_metrics(runner) == ''
+    runner.start('promotion', 'voice', 501)
+    metrics = evidence_metrics(runner)
+    assert 'simulation_evidence_result' in metrics
+    assert 'simulation_evidence_performance' not in metrics
+    assert 'simulation_evidence_drift' not in metrics
+
+
+def test_simulation_dashboard_keeps_sources_explicit():
+    import json
+    from pathlib import Path
+
+    from pipeline.build_simulation_dashboard import build
+    dashboard = build()
+    stored = Path(__file__).resolve().parents[1] / 'monitoring/grafana/dashboards/biometric-simulation.json'
+    assert json.loads(stored.read_text(encoding='utf-8')) == dashboard
+    assert 'SYNTHETIC' in dashboard['title']
+    assert len(dashboard['panels']) == 10
+    for panel in dashboard['panels']:
+        assert 'SYNTHETIC' in panel['description']
+        for target in panel['targets']:
+            assert 'synthetic="true"' in target['expr']
+            assert 'job="simulation"' in target['expr']

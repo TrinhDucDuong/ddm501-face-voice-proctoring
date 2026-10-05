@@ -175,7 +175,10 @@ class SimulationRunner:
                     run['baseline_version'] = version
             db.commit()
         engine.dispose()
-        self.artifact(run, 'reference', window('baseline', run['seed'], drift=False))
+        reference = window('baseline', run['seed'], drift=False)
+        self.artifact(run, 'reference', reference)
+        self.artifact(run, 'baseline-report', evaluate(reference,
+            window('healthy', run['seed'] + 1, drift=False), run['modality'], run['baseline_version'], 'healthy'))
 
     def _drift(self, run):
         reference = json.loads((self.directory(run) / 'reference.json').read_text())

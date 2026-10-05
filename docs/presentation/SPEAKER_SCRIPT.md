@@ -1,0 +1,608 @@
+# Kịch bản nói: Face + Voice Integrity
+
+Bản bảo vệ DDM501, cập nhật 05/10/2026. Sinh từ deck-content.json; tên PowerPoint khi export: `DDM501_Defense_15p_Demo13p_QA10p.pptx` trong cùng thư mục.
+
+**Khung thời gian:** trình bày 15 phút, demo mục tiêu 13 phút (cho phép 10–15 phút), Q&A 10 phút. Tổng buổi bảo vệ 35–40 phút, bản đầy đủ 38 phút. Có 18 slide trình bày, 8 slide dẫn demo, 1 slide Q&A và 6 slide phụ lục. Notes được tạo khi export PowerPoint từ nguồn này. Các PPTX/PDF trong archive là bản lịch sử, không đồng bộ tự động với nguồn hiện hành.
+
+Kịch bản thao tác toàn diện: [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md). Câu hỏi phản biện và phân vai: [QA_GUIDE.md](QA_GUIDE.md).
+
+## Cách sử dụng
+
+- Tập nói theo ý, không đọc nguyên slide. Các đoạn dưới là lời thoại có thể đọc trực tiếp.
+- Phần **Thao tác** dành cho người điều khiển máy, không đọc thành tiếng.
+- Mốc thời gian là ngân sách cho giải thích và thao tác, không phải cam kết scheduler chạy đúng số giây.
+- Câu chuyện mở đầu là tình huống giả định. Không nói nhóm đã phát hiện một vụ gian lận thật.
+- Số liệu evidence ngày 03/10 là lịch sử đã lưu. Nếu mở run mới, đọc kết quả của chính run đó.
+- Phụ lục được đánh dấu hidden trong trình chiếu. Mở bằng chọn slide khi cần trả lời câu hỏi.
+
+## Phân vai đề xuất
+
+| Người nói | Slide | Nội dung |
+|---|---|---|
+| Trịnh Đức Dương | 1–5, 14–15; điều phối Q&A | Câu chuyện, giải pháp và lifecycle |
+| To Thanh Hai | 6–9, 16 | Tích hợp, model I/O, kiến trúc, lưu trữ, CI/CD; điều khiển demo |
+| Do Quang Hiep | 10–13; phụ lục khi cần | Drift, decision engine, template và kiểm chứng evaluation |
+| Ngo Anh Duc | 17–18, dẫn demo 19–26 | Giới hạn, chuyển phần, bằng chứng và demo |
+
+Nếu chỉ một người trình bày, bỏ các câu mời chuyển lời và giữ nguyên mạch nội dung.
+
+## Chuẩn bị trước buổi trình bày
+
+1. Mở PowerPoint và dùng Presenter View để xem Notes. Đóng cửa sổ chứa key hoặc thông tin riêng.
+2. Kiểm tra Docker Desktop và Airflow scheduler hoạt động. Không nâng cấp dependencies hoặc rebuild sát giờ.
+3. Đăng nhập platform ở portal :18501 trước khi chiếu màn hình. Không hiển thị hoặc đọc API key.
+4. Mở sẵn Airflow DAG `biometric_simulation` tại :18081 và MLflow simulation tại :15031.
+5. Dùng nút **3. Khôi phục baseline demo** nếu có run trước đó. Không dùng `docker compose down -v`.
+6. Lưu sẵn evidence JSON của một lượt promotion và rollback thành công về mặt kịch bản. Slides 23 và 25 có evidence lịch sử dự phòng.
+7. Đo thử thời gian hai kịch bản trên chính máy trình chiếu. Giới hạn demo tối đa 15 phút; nếu cần, dùng evidence lịch sử cho kịch bản thứ hai như DEMO_RUNBOOK hướng dẫn.
+
+## Lời thoại theo slide
+
+### Slide 01: Ai thực sự đang làm bài?
+
+**Người nói:** Trịnh Đức Dương
+
+**Mốc thời gian:** Trình bày 00:00–00:25
+
+**Lời thoại**
+
+Kính chào thầy cô và các bạn. Nhóm em trình bày dự án Face + Voice Integrity. Điểm xuất phát của dự án là một câu hỏi rất gần với các kỳ đánh giá trực tuyến: người đang làm bài có đúng là nhân viên đã đăng ký hay không? Trong phần trình bày, nhóm sẽ đi từ tình huống kinh doanh tới cách xác minh, sau đó demo vòng đời MLOps khi dữ liệu thay đổi và khi một bản cập nhật cần bị thu hồi.
+
+**Thao tác / chuyển lời**
+
+Mở slide ở chế độ trình chiếu. Chưa mở dashboard hoặc nói tên các công cụ.
+
+**Nguồn đối chiếu:** README.md; PROJECT_REQUIREMENTS.md
+
+### Slide 02: Một tài khoản đúng, một người làm bài khác
+
+**Người nói:** Trịnh Đức Dương
+
+**Mốc thời gian:** Trình bày 00:25–01:40
+
+**Lời thoại**
+
+Xin mời thầy cô hình dung một doanh nghiệp tổ chức đánh giá ngoại ngữ thường niên. Lúc 8 giờ 55, một nhân viên đăng nhập bằng đúng tài khoản của mình. Hệ thống xác nhận tài khoản hợp lệ. Đến phần nói, một người khác có năng lực tốt hơn có thể hỗ trợ hoặc thực hiện thay. Khi kết thúc, hệ thống vẫn nhận được một bài làm gắn với đúng tài khoản. Nếu kết quả ấy được dùng để lập kế hoạch đào tạo hoặc phân công công việc, sai lệch danh tính sẽ làm sai lệch quyết định phía sau. Đến lúc có nghi vấn, HR lại thiếu bằng chứng tại thời điểm cần kiểm tra. Đây là tình huống giả định mà nhóm dùng để đặt yêu cầu thiết kế, không phải một vụ gian lận đã được nhóm xác minh. Từ đó, nhóm đặt vấn đề: làm sao bổ sung bằng chứng danh tính vào phần mềm thi đang có?
+
+**Thao tác / chuyển lời**
+
+Chỉ theo ba mốc thời gian. Dừng ngắn sau câu 'hệ thống vẫn nhận được một bài làm gắn với đúng tài khoản'.
+
+**Nguồn đối chiếu:** PROJECT_REPORT.md: Câu chuyện business; SAAS_INTEGRATION.md
+
+### Slide 03: Ba khó khăn khiến việc xác minh cần được bổ sung
+
+**Người nói:** Trịnh Đức Dương
+
+**Mốc thời gian:** Trình bày 01:40–02:25
+
+**Lời thoại**
+
+Nhóm nhìn thấy ba khó khăn liên quan với nhau. Thứ nhất là độ tin cậy của kết quả khi danh tính người làm bài có thể thay đổi. Thứ hai là khối lượng rà soát: có video hay audio chưa chắc đã giúp HR nhanh chóng tìm đúng thời điểm cần xem. Thứ ba là nguy cơ kết luận nhầm. Một nhân viên làm bài trung thực vẫn có thể bị điểm tương đồng thấp vì camera tối, microphone khác hoặc mẫu ghi danh đã cũ. Vì vậy, mục tiêu không chỉ là phát hiện thêm nghi vấn. Hệ thống còn phải trả được lý do, giữ được bằng chứng phù hợp và có cơ chế xử lý khi chính mô hình không còn hoạt động như trước. Nhóm chưa đo được mức giảm gian lận hay số giờ tiết kiệm tại doanh nghiệp thật.
+
+**Thao tác / chuyển lời**
+
+Nhấn vào khó khăn thứ ba để chuẩn bị cho câu chuyện drift ở phần sau.
+
+**Nguồn đối chiếu:** PROJECT_REQUIREMENTS.md; ARCHITECTURE.md
+
+### Slide 04: Hệ thống kiểm tra những dấu hiệu nào?
+
+**Người nói:** Trịnh Đức Dương
+
+**Mốc thời gian:** Trình bày 02:25–03:10
+
+**Lời thoại**
+
+Nhóm giới hạn bài toán vào danh tính và tính toàn vẹn của capture. Đối với thi hộ hoặc thay người, hệ thống so khớp khuôn mặt và giọng nói với mẫu của nhân viên đã ghi danh. Các detector bổ sung tìm dấu hiệu ảnh giả, âm thanh tổng hợp, nhiều khuôn mặt hoặc thay đổi người nói. Một tín hiệu khác là tái sử dụng chính xác media trong cùng phiên. Tuy nhiên, nhóm không xem những detector này là lời bảo đảm phát hiện mọi hành vi gian lận. Chúng chưa giải quyết đầy đủ đọc tài liệu ngoài màn hình, nhờ người gợi ý hoặc mọi loại deepfake. Vì thế, kết quả suspicious phải đi kèm lý do và được đặt vào quy trình xem xét của khách hàng, không biến thành quyết định kỷ luật tự động.
+
+**Thao tác / chuyển lời**
+
+Không gọi hệ thống là phần mềm chống gian lận toàn diện.
+
+**Nguồn đối chiếu:** README.md; ARCHITECTURE.md; RESPONSIBLE_AI.md
+
+### Slide 05: Bổ sung xác minh vào phần mềm thi đang có
+
+**Người nói:** Trịnh Đức Dương
+
+**Mốc thời gian:** Trình bày 03:10–03:50
+
+**Lời thoại**
+
+Doanh nghiệp thường đã có phần mềm thi và không muốn thay toàn bộ hệ thống. Vì vậy, nhóm chọn cách cung cấp một dịch vụ tích hợp. Khách hàng giữ bài thi, tài khoản, lịch capture, điểm và quyền quyết định. Dịch vụ của nhóm nhận ảnh và WAV, thực hiện kiểm tra rồi trả kết quả ngay qua API và gửi webhook. Portal giúp quản trị công ty xem lịch sử và bằng chứng. Nhịp gửi dữ liệu do khách hàng chọn, không phải hệ thống của nhóm liên tục stream toàn bộ phiên thi. Quy mô khoảng năm mươi nghìn nhân viên là mục tiêu để định hướng thiết kế dữ liệu và vận hành, chưa phải kết quả đo tải. Tiếp theo, Hải sẽ giải thích luồng tích hợp và cách hệ thống triển khai.
+
+**Thao tác / chuyển lời**
+
+Chuyển lời: 'Mời Hải trình bày hành trình một lượt kiểm tra'.
+
+**Nguồn đối chiếu:** SAAS_INTEGRATION.md; README.md
+
+### Slide 06: Một lượt kiểm tra đi qua năm bước
+
+**Người nói:** To Thanh Hai
+
+**Mốc thời gian:** Trình bày 03:50–04:35
+
+**Lời thoại**
+
+Một lượt kiểm tra bắt đầu từ mẫu ghi danh đã được nhân viên cung cấp với sự đồng ý. Backend của công ty gửi capture cùng định danh nhân viên, phiên và request. Dịch vụ thực hiện kiểm tra identity và các tín hiệu integrity, lưu kết quả rồi trả lại qua API. Webhook có chữ ký HMAC giúp khách hàng xác minh nguồn gửi, nhưng receiver vẫn phải chống xử lý trùng vì cơ chế retry có thể giao một thông báo nhiều lần. Khi cần xem xét, quản trị công ty có lịch sử, lý do và evidence theo đúng tenant. Idempotency là chi tiết quan trọng: gửi lại cùng request và cùng payload không được tạo thêm một quyết định khác.
+
+**Thao tác / chuyển lời**
+
+Đi từ trái sang phải. Có thể nhắc verified, suspicious và inconclusive bằng lời.
+
+**Nguồn đối chiếu:** api/app/checks.py; api/app/webhooks.py; SAAS_INTEGRATION.md
+
+### Slide 07: Model biến ảnh và giọng nói thành quyết định
+
+**Người nói:** To Thanh Hai
+
+**Mốc thời gian:** Trình bày 04:35–05:30
+
+**Lời thoại**
+
+Đầu vào của nhánh Face là ảnh. YuNet định vị khuôn mặt và SFace tạo embedding. Đầu vào của nhánh Voice là WAV, ECAPA tạo embedding giọng nói. Các vector được chuẩn hóa rồi so với tập template của đúng người được khai báo bằng cosine similarity. Hệ thống lấy mức tương đồng tốt nhất với tập template và áp dụng ngưỡng riêng cho từng modality. Vì đây là so khớp một người với mẫu của chính họ, nó là xác minh một-một, không phải tìm người giống nhất trong toàn bộ nhân viên. Trong dự án, model được huấn luyện lại là policy ngưỡng. Nhóm không tuyên bố fine-tune lại SFace hoặc ECAPA. Điều này cũng giải thích vì sao champion và challenger có thể dùng chung score nhưng trả quyết định khác nhau.
+
+**Thao tác / chuyển lời**
+
+Nhấn rõ chữ 'threshold policy' để tránh hiểu nhầm retrain encoder.
+
+**Nguồn đối chiếu:** api/app/biometrics.py; pipeline/modality_training.py; docs/MODALITY_LIFECYCLE.md
+
+### Slide 08: Serving, vòng đời model và monitoring dùng chung dữ liệu có kiểm soát
+
+**Người nói:** To Thanh Hai
+
+**Mốc thời gian:** Trình bày 05:30–06:30
+
+**Lời thoại**
+
+Kiến trúc có ba luồng chính. Serving xử lý request của khách hàng và ghi kết quả vào PostgreSQL, lưu media nghi vấn vào MinIO khi cần. Luồng MLOps do Airflow điều phối, lấy snapshot có phiên bản, tạo policy và lưu thông tin đánh giá trong MLflow. Luồng monitoring thu các chỉ số dịch vụ và model để hiển thị trong Grafana, đồng thời định tuyến cảnh báo. Registry quản lý phiên bản model, còn database lưu trạng thái triển khai và routing. Chúng có vai trò khác nhau. Hệ thống hiện chạy trên một máy bằng Docker Compose. Riêng simulation có vùng dữ liệu và MLflow riêng để có thể minh họa lỗi mà không đổi policy production. Host và scheduler vẫn dùng chung nên nhóm không gọi đây là cách ly tài nguyên tuyệt đối.
+
+**Thao tác / chuyển lời**
+
+Chỉ ra vòng feedback giữa PostgreSQL và Airflow, không đọc danh sách công cụ liên tục.
+
+**Nguồn đối chiếu:** ARCHITECTURE.md; docker-compose.yml; docs/SIMULATION.md
+
+### Slide 09: Lưu đúng bằng chứng và giới hạn quyền truy cập
+
+**Người nói:** To Thanh Hai
+
+**Mốc thời gian:** Trình bày 06:30–07:10
+
+**Lời thoại**
+
+Dữ liệu được lưu theo mục đích. PostgreSQL chứa embedding JSON, phiên bản template, các lượt kiểm tra và audit. MinIO chứa artifact cùng evidence media nghi vấn. Project hiện không dùng embedding database chuyên dụng như một vector search engine, vì đường serving là truy xuất template theo định danh đã biết. Các lượt đọc lịch sử và tải evidence được ràng buộc tenant, nên một công ty không thể đọc dữ liệu của công ty khác. Raw enrollment không được giữ mặc định. Query embeddings phục vụ monitoring cũng có cơ chế opt-in và thời hạn lưu. Đổi lại, nếu không giữ vector hoặc không có đủ nhãn tin cậy, hệ thống phải chấp nhận chưa đủ dữ liệu để kết luận drift. Sau đây Hiệp trình bày cách kiểm chứng điều đó.
+
+**Thao tác / chuyển lời**
+
+Chuyển lời: 'Mời Hiệp giải thích vì sao score giảm chưa đủ để retrain'.
+
+**Nguồn đối chiếu:** ARCHITECTURE.md; docs/MODALITY_LIFECYCLE.md
+
+### Slide 10: Score giảm có thể đến từ nhiều nguyên nhân
+
+**Người nói:** Do Quang Hiep
+
+**Mốc thời gian:** Trình bày 07:10–08:00
+
+**Lời thoại**
+
+Quay lại tình huống một nhân viên trung thực bị từ chối nhiều hơn. Nếu chỉ nhìn score giảm và lập tức retrain, chúng ta có thể sửa sai chỗ. Camera mới thiếu sáng hoặc mic kém cần xử lý capture. Nếu chỉ những người có mẫu ghi danh rất cũ gặp vấn đề, cập nhật template có thể phù hợp hơn. Chỉ khi bằng chứng cho thấy policy thực sự suy giảm trên dữ liệu được review và nhiều cohort thì retrain mới đáng cân nhắc. Vì vậy, project không để một kiểm định thống kê duy nhất điều khiển pipeline. Drift engine tổng hợp nhiều lớp tín hiệu để chọn hành động phù hợp, đồng thời giữ trạng thái chưa đủ bằng chứng khi dữ liệu còn thiếu.
+
+**Thao tác / chuyển lời**
+
+Dùng ví dụ 'đổi microphone' để giải thích input drift thay vì đọc định nghĩa thống kê.
+
+**Nguồn đối chiếu:** pipeline/drift_decision.py; docs/MODALITY_LIFECYCLE.md
+
+### Slide 11: Năm lớp bằng chứng để đánh giá drift
+
+**Người nói:** Do Quang Hiep
+
+**Mốc thời gian:** Trình bày 08:00–09:05
+
+**Lời thoại**
+
+Lớp đầu là chất lượng input, ví dụ độ sáng và blur của ảnh hoặc RMS và tỷ lệ im lặng của audio. Project dùng PSI để so sánh phân phối. Lớp thứ hai là embedding drift, dùng RBF MMD bình phương trên vector đa chiều, không kiểm từng chiều một cách độc lập. Lớp thứ ba là score drift, tách genuine và impostor khi có nhãn tin cậy để theo dõi hướng dịch chuyển và khoảng cách tới ngưỡng. Lớp thứ tư đo performance thật trên reviewed samples, bao gồm chấp nhận sai và từ chối sai. Cuối cùng là phân tích theo tuổi template. Mỗi modality có báo cáo riêng. Các feature như SNR hoặc góc quay đầu chưa được đo trong implementation thì nhóm không đưa vào như thể đã có. Công thức và ngưỡng chi tiết nằm ở phụ lục để phục vụ câu hỏi sâu.
+
+**Thao tác / chuyển lời**
+
+Giải thích FMR là chấp nhận sai người và FNMR là từ chối nhầm người thật.
+
+**Nguồn đối chiếu:** pipeline/drift_decision.py; api/app/biometrics.py; pipeline/lifecycle_config.json
+
+### Slide 12: Decision engine quyết định hành động theo bằng chứng
+
+**Người nói:** Do Quang Hiep
+
+**Mốc thời gian:** Trình bày 09:05–10:10
+
+**Lời thoại**
+
+Bảng này thể hiện quyết định vận hành. Chất lượng capture thay đổi thì điều tra input. Embedding hoặc score drift nhưng performance vẫn ổn thì theo dõi. Template cũ suy giảm riêng thì đi sang workflow template. Retrain yêu cầu embedding và score drift kéo dài, performance có nhãn review suy giảm trên nhiều nhóm tuổi, cùng điều kiện dữ liệu mới và cooldown. Mặc định cần ba cửa sổ mới đủ điều kiện, không phải refresh cùng một cửa sổ ba lần. Một điểm quan trọng là trạng thái insufficient data. Nó không có nghĩa hệ thống khỏe và cũng không có nghĩa đang drift. Nó nói rằng bằng chứng hiện tại chưa cho phép tự động hành động. Nguyên tắc này giúp hạn chế việc pipeline chạy đẹp nhưng dựa trên nhãn do chính model tự suy ra.
+
+**Thao tác / chuyển lời**
+
+Không mô tả các quy tắc là chứng minh quan hệ nhân quả tuyệt đối.
+
+**Nguồn đối chiếu:** pipeline/drift_decision.py; api/app/lifecycle_service.py
+
+### Slide 13: Cập nhật template và retrain có hai đường kiểm soát
+
+**Người nói:** Do Quang Hiep
+
+**Mốc thời gian:** Trình bày 10:10–10:55
+
+**Lời thoại**
+
+Với template update, nguy cơ lớn là template poisoning. Nếu cứ chấp nhận một lần xác minh thành công rồi thay mẫu bằng capture vừa gửi, một sai sót có thể bị khuếch đại. Vì vậy, workflow yêu cầu nhiều quan sát trusted, capture đủ chất lượng, margin lớn, nhất quán và không xung đột danh tính. Candidate template được đánh giá trên holdout riêng trước khi đổi con trỏ active, đồng thời giữ phiên bản trước để rollback. Với retrain, monitoring không tự train ngay trong request. Nó tạo intent để Airflow điều phối theo từng modality. Snapshot có phiên bản, CV tách theo identity và holdout không dùng để chọn ngưỡng. Hai đường này cùng nhằm tránh biến một thay đổi thiếu bằng chứng thành thay đổi production. Dương sẽ tiếp tục với quy trình challenger và canary.
+
+**Thao tác / chuyển lời**
+
+Chuyển lời sang Dương, nhấn rằng dữ liệu mới không đồng nghĩa được quyền đưa vào training.
+
+**Nguồn đối chiếu:** api/app/template_lifecycle.py; pipeline/modality_training.py; airflow/dags/biometric_ml_pipeline.py
+
+### Slide 14: Model mới phải vượt qua cả offline và traffic gate
+
+**Người nói:** Trịnh Đức Dương
+
+**Mốc thời gian:** Trình bày 10:55–12:00
+
+**Lời thoại**
+
+Sau training, policy mới chỉ là candidate. Offline gate so sánh candidate với champion trên đúng cùng một holdout. Nếu đạt, candidate trở thành challenger và được thử ở shadow. Trong shadow, request vẫn nhận quyết định của champion, nhưng hệ thống ghi lại quyết định của cả hai policy. Sau đó mới tới canary, nơi một phần traffic thực sự dùng threshold của challenger. Chỉ khi tất cả stage đạt điều kiện thì challenger mới trở thành champion. Nếu không đạt, phiên bản đó được giữ lại cùng lý do rejection để audit. Alias champion do đó có ý nghĩa phiên bản được chọn để phục vụ, không chỉ là tên môi trường. Với hai modality, Face có thể giữ champion cũ trong khi Voice đang rollout phiên bản khác.
+
+**Thao tác / chuyển lời**
+
+Chỉ nhánh thất bại trong sơ đồ. Làm rõ score dùng chung còn threshold và decision có thể khác.
+
+**Nguồn đối chiếu:** api/app/model_lifecycle.py; api/app/lifecycle_api.py; docs/MODALITY_LIFECYCLE.md
+
+### Slide 15: Mỗi canary stage đều cần đủ mẫu, thời gian và nhãn
+
+**Người nói:** Trịnh Đức Dương
+
+**Mốc thời gian:** Trình bày 12:00–12:45
+
+**Lời thoại**
+
+Canary không chỉ là một thanh phần trăm đẹp trên dashboard. Request được phân tuyến ổn định theo cohort. Mỗi stage phải có đủ quan sát, thời gian và nhãn tin cậy, rồi kiểm tra cả security lẫn chất lượng. FMR là điều kiện nhạy cảm: không cho phép tăng so với champion và còn phải nằm trong budget tuyệt đối. FNMR có mức hồi quy nhỏ được cấu hình. Ngoài ra còn có latency policy, disagreement và cohort chất lượng. Nếu nhãn chưa về đủ thì stage chờ, không tự thông qua vì chưa thấy lỗi. Nếu gate thất bại, challenger traffic về không. Nhãn đến muộn được đánh giá theo tick hàng giờ nên nhóm không gọi đó là phản ứng tức thời trong mọi tình huống.
+
+**Thao tác / chuyển lời**
+
+Phân biệt ngưỡng pilot này với demo 200 request/stage và 5 giây tối thiểu.
+
+**Nguồn đối chiếu:** pipeline/lifecycle_config.json; api/app/model_lifecycle.py
+
+### Slide 16: CI/CD cập nhật ứng dụng, lifecycle cập nhật policy
+
+**Người nói:** To Thanh Hai
+
+**Mốc thời gian:** Trình bày 12:45–13:40
+
+**Lời thoại**
+
+Ở đây có hai kiểu triển khai cần phân biệt. Code ứng dụng đi qua GitHub Actions: quality trên Ubuntu, preflight trên Windows, build images rồi runner Linux trong WSL gọi PowerShell để triển khai bằng Docker Desktop. Phần này là thay container bằng Compose trên một host. Nó chưa phải canary của nhiều replica ứng dụng. Còn policy Face và Voice được thay đổi qua trạng thái lifecycle trong PostgreSQL và alias MLflow, có shadow, canary và rollback như vừa trình bày. Prometheus và Grafana quan sát cả hai lớp. Hai test preflight Windows phải thực thi và không skip, vì quality job xanh trên Ubuntu một mình không đủ chứng minh chúng đã chạy.
+
+**Thao tác / chuyển lời**
+
+Chuyển sang Đức để trình bày bằng chứng và điều phối demo.
+
+**Nguồn đối chiếu:** .github/workflows/ci.yml; DEPLOYMENT.md; OPERATIONS.md
+
+### Slide 17: Những gì cần kiểm chứng trước khi triển khai cho doanh nghiệp
+
+**Người nói:** Ngo Anh Duc
+
+**Mốc thời gian:** Trình bày 13:40–14:35
+
+**Lời thoại**
+
+Để đưa tới doanh nghiệp, còn ba nhóm việc phải làm. Nhóm đầu là dữ liệu thật có sự đồng ý và nhãn review đủ tin cậy để đo FMR, FNMR và fairness trên cohort phù hợp. Nhóm thứ hai là tải và vận hành: năm mươi nghìn nhân viên không đồng nghĩa năm mươi nghìn request đồng thời, nên phải đo theo lịch sử dụng thực tế và bổ sung các điều kiện triển khai. Nhóm thứ ba là những điểm chưa khép kín trong code hiện tại: lifecycle mới tạo báo cáo RAI nhưng chưa áp dụng cờ fairness legacy làm gate, và registry mới chưa có quy trình tự tạo champion production đã đánh giá. Nhóm ghi rõ những giới hạn đó để phân biệt một demo MLOps có kiểm chứng với một sản phẩm đã sẵn sàng triển khai đại trà.
+
+**Thao tác / chuyển lời**
+
+Nêu giới hạn dứt khoát, sau đó chuyển sang trách nhiệm hoàn thiện của nhóm.
+
+**Nguồn đối chiếu:** ARCHITECTURE.md; README.md; SCALABILITY_COST.md
+
+### Slide 18: Xác minh danh tính và kiểm soát thay đổi model
+
+**Người nói:** Ngo Anh Duc
+
+**Mốc thời gian:** Trình bày 14:35–15:00
+
+**Lời thoại**
+
+Phần trình bày vừa rồi nối bài toán thi hộ với cách xác minh danh tính và kiểm soát thay đổi của model. Dịch vụ trả tín hiệu và bằng chứng để doanh nghiệp xem xét, còn model mới phải qua các gate trước khi phục vụ. Sau đây nhóm dành khoảng mười ba phút để đi trọn luồng sản phẩm, monitoring và hai kịch bản simulation. Hải điều khiển máy, Đức dẫn demo, Dương và Hiệp giải thích các điểm kỹ thuật khi cần.
+
+**Thao tác / chuyển lời**
+
+Chuyển sang phần demo. Khởi động đồng hồ demo riêng.
+
+**Nguồn đối chiếu:** README.md; docs/MODALITY_LIFECYCLE.md
+
+### Slide 19: Demo sản phẩm: tạo nhân viên và ghi danh
+
+**Người nói:** Ngo Anh Duc dẫn, To Thanh Hai thao tác
+
+**Mốc thời gian:** Demo 00:00–02:00
+
+**Lời thoại**
+
+Đầu tiên nhóm vào không gian công ty A bằng operator session đã đăng nhập trước. Hải tạo một nhân viên có mã riêng cho buổi demo rồi mở trang ghi danh. Nhóm dùng hai ảnh và hai WAV được phép sử dụng. Sau khi ghi danh, trạng thái nhân viên phải là đủ mẫu. Nếu muốn minh họa self-enrollment, có thể dùng lời mời một lần trong 24 giờ, nhưng chỉ chọn một đường ghi danh trong buổi bảo vệ. Việc ghi danh là bắt đầu của luồng, chưa chứng minh danh tính pháp lý của người đăng ký. Mẫu đã chuẩn bị giúp tập trung vào cơ chế, còn capture camera và microphone cần được kiểm thử trước trên chính trình duyệt này.
+
+**Thao tác / chuyển lời**
+
+Demo 00:00–02:00. Không đăng ký công ty hoặc cấp key mới trên màn chiếu. Nếu inference chậm, dùng nhân viên dự phòng đã ghi danh và nói rõ.
+
+**Nguồn đối chiếu:** ui/app.py; docs/EMPLOYEE_DEMO.md; docs/SIMULATION.md
+
+### Slide 20: Demo xác minh: đúng người, nghi vấn và bằng chứng
+
+**Người nói:** Ngo Anh Duc dẫn, To Thanh Hai thao tác
+
+**Mốc thời gian:** Demo 02:00–05:00
+
+**Lời thoại**
+
+Ở trang Kiểm tra tích hợp, nhóm chọn người A và gửi ảnh cùng giọng nói mới của A. Chúng ta đọc kết quả thực tế, gồm scores, match, capability và reason. Nếu detector trả suspicious hoặc inconclusive vì capture không phù hợp, nhóm giải thích đúng trạng thái đó. Tiếp theo vẫn khai báo người A nhưng gửi media của B đã được phép sử dụng. Kịch bản này kiểm tra identity mismatch. Nhóm mở Lịch sử và báo cáo, chọn đúng phiên demo và check vừa tạo để xem lý do và evidence. Ở API và Webhook, nhóm kiểm tra delivery của check đó. Công ty B chỉ thấy roster của B. Nếu cần chứng minh chặn truy cập trực tiếp, dùng request cross-tenant đã chuẩn bị và xem HTTP 404. Các check của phần này được lưu vào tenant demo của ứng dụng chính, khác với vùng dữ liệu cách ly của simulation.
+
+**Thao tác / chuyển lời**
+
+Demo 02:00–05:00. Tránh gửi lại cùng media nhiều lần trong một phiên rồi gọi capture_reused là model lỗi. Không lưu human labels cho dữ liệu tổng hợp.
+
+**Nguồn đối chiếu:** ui/app.py; docs/EMPLOYEE_DEMO.md; docs/SIMULATION.md
+
+### Slide 21: Demo vận hành: monitoring và khởi động simulation
+
+**Người nói:** Ngo Anh Duc dẫn, To Thanh Hai thao tác
+
+**Mốc thời gian:** Demo 05:00–06:00
+
+**Lời thoại**
+
+Nhóm chuyển từ không gian công ty sang monitoring của nền tảng. Grafana thể hiện hoạt động dịch vụ và độ mới của các collector. Thiếu human labels có thể tạo trạng thái chờ. No data không có nghĩa là không có drift. Sau đó mở tab platform riêng, chọn Voice trong Simulation MLOps và bắt đầu kịch bản promotion. Đây là điểm chuyển ranh giới dữ liệu: từ đây, các vector và nhãn là synthetic, được lưu trong database và MLflow riêng. Airflow cần thời gian nhận job, nên nhóm dùng khoảng chờ để chỉ run ID và đường đi của alert. Mở thêm dashboard Simulation /d/biometric-simulation, chọn đúng scenario và modality để đọc evidence. Overview chỉ có 10 panel tổng quan; không tìm các nhóm panel chi tiết của dashboard cũ.
+
+**Thao tác / chuyển lời**
+
+Demo 05:00–06:00. Dùng tab/browser profile riêng đã đăng nhập platform để giữ phiên operator.
+
+**Nguồn đối chiếu:** ui/app.py; docs/EMPLOYEE_DEMO.md; docs/SIMULATION.md
+
+### Slide 22: Demo promotion: alert, các gate và champion
+
+**Người nói:** Ngo Anh Duc, thao tác: To Thanh Hai
+
+**Mốc thời gian:** Demo 06:00–09:00
+
+**Lời thoại**
+
+Run promotion đã bắt đầu ở bước trước. Bây giờ nhóm theo dõi receipt của alert qua Prometheus và Alertmanager trước training. Tiếp theo mở phần offline để thấy candidate và champion được so trên cùng holdout. Shadow phải giữ champion làm câu trả lời, còn canary có số request dùng challenger tăng qua các stage. Trên MLflow simulation, kiểm tra model name có tiền tố simulation và version đang được alias champion trỏ tới. Kết thúc cần đọc kết quả của đúng run đang chiếu. Nếu chưa hoàn tất sau khung chờ, nhóm nói rõ và dùng slide evidence lịch sử tiếp theo để giữ thời gian. Những request trong simulation đi qua HTTP endpoint embedding, không phải ảnh hoặc WAV từ nhân viên thật.
+
+**Thao tác / chuyển lời**
+
+Demo 06:00–09:00. Run đã được tạo ở slide trước, không bấm nút 1 lần nữa. Xem alert receipt, offline, shadow, canary và version. Nếu chậm, dùng evidence lịch sử có ghi ngày.
+
+**Nguồn đối chiếu:** ui/simulation.py; docs/SIMULATION.md; docs/EVIDENCE.md
+
+### Slide 23: Lượt promotion đã ghi nhận có traffic thực qua từng stage
+
+**Người nói:** Ngo Anh Duc
+
+**Mốc thời gian:** Demo 09:00–09:30
+
+**Lời thoại**
+
+Đây là lượt promotion đã được lưu ngày 3 tháng 10, không phải số đếm được bịa để minh họa. Với 200 request mỗi stage, số request dùng challenger tăng theo rollout. Tỷ lệ thực tế ở stage nhỏ không nhất thiết đúng tuyệt đối 5 hay 10 phần trăm vì đây là mẫu hữu hạn được phân tuyến bằng hash. Shadow có không request nào dùng challenger để trả kết quả. Sau promotion, 200 probe đều dùng version 2. Đây là HTTP traffic tới endpoint embedding của simulation, không phải 200 nhân viên đã thực hiện capture thật.
+
+**Thao tác / chuyển lời**
+
+Demo 09:00–09:30. Nếu run live đã xong, ưu tiên số của run live. Bảng trên slide là evidence lịch sử ngày 03/10, không thay thế kết quả của run mới.
+
+**Nguồn đối chiếu:** docs/archive/presentation-2026-10-04 (evidence slide ngày 03/10; bản lưu lịch sử); reports/simulation-promotion.json
+
+### Slide 24: Demo 2: lỗi canary phải dừng rollout
+
+**Người nói:** Ngo Anh Duc, thao tác: To Thanh Hai
+
+**Mốc thời gian:** Demo 09:30–12:00
+
+**Lời thoại**
+
+Trước kịch bản thứ hai, nhóm khôi phục baseline demo. Việc reset chỉ áp dụng trong vùng simulation, không xóa dữ liệu production hoặc lịch sử audit. Lần này chọn Face và bấm Canary lỗi, rollback. Candidate vẫn đi qua calibration, offline và shadow. Điểm khác là tại canary 25 phần trăm, kịch bản đưa vào impostor có score cao để làm FMR vượt điều kiện an toàn. Điều nhóm cần chứng minh không phải job lúc nào cũng xanh theo nghĩa model được promote. Điều cần chứng minh là gate dừng rollout, traffic quay lại champion và nguyên nhân thất bại được lưu. Trạng thái FAILED_CANARY ở đây là kết quả đúng của kịch bản. Nếu đang chờ scheduler, nhóm chuyển sang evidence đã lưu ở slide tiếp theo, nói rõ đây là bằng chứng lịch sử. Sau khi kiểm tra, khôi phục baseline một lần nữa để kết thúc demo.
+
+**Thao tác / chuyển lời**
+
+Demo 09:30–12:00. Reset baseline, chọn Face, bấm nút 2 một lần. Kiểm tra failure tại 25% và traffic quay về champion. Nếu hạ tầng chậm, chuyển sang evidence lịch sử.
+
+**Nguồn đối chiếu:** docs/SIMULATION.md; ui/simulation.py; reports/simulation-rollback.json
+
+### Slide 25: Rollback giữ lại model ổn định và bằng chứng thất bại
+
+**Người nói:** Ngo Anh Duc
+
+**Mốc thời gian:** Demo 12:00–12:30
+
+**Lời thoại**
+
+Trong lượt rollback đã ghi nhận, failure xảy ra tại canary 25 phần trăm. Các mẫu impostor được tiêm làm FMR challenger vượt mức không hồi quy của champion. Sau khi dừng rollout, cả 200 probe đều dùng version 1. Model thất bại không bị xóa, vì nhóm vẫn cần lý do, stage, metric và phiên bản để điều tra. Báo cáo đối chiếu cũng xác nhận policy production không thay đổi qua hai kịch bản simulation. Đây là điều kiện để demo lỗi trên lớp mà vẫn giữ môi trường vận hành ổn định.
+
+**Thao tác / chuyển lời**
+
+Demo 12:00–12:30. Đối chiếu probe và failed metric trong run live. Bảng tóm tắt trên slide là lượt lịch sử.
+
+**Nguồn đối chiếu:** reports/simulation-verification.json; docs/archive/presentation-2026-10-04 (evidence slide ngày 03/10; bản lưu lịch sử)
+
+### Slide 26: Kết thúc demo: phục hồi baseline và giữ audit
+
+**Người nói:** Ngo Anh Duc dẫn, To Thanh Hai thao tác
+
+**Mốc thời gian:** Demo 12:30–13:00
+
+**Lời thoại**
+
+Nhóm kết thúc bằng nút khôi phục baseline demo và xác nhận trạng thái reset. Lịch sử cùng evidence vẫn được giữ để người khác kiểm tra. Nếu có snapshot production policy trước và sau, nhóm đối chiếu champion, traffic và lifecycle state để chứng minh hai simulation không thay đổi chúng. Các check của phần demo sản phẩm vẫn là dữ liệu đã thêm vào tenant demo, không bị xóa bởi nút reset simulation. Nhóm đã trình diễn cả đường thành công, đường lỗi và cách đưa môi trường demo về trạng thái ban đầu. Phần còn lại là mười phút trao đổi với thầy cô và các bạn.
+
+**Thao tác / chuyển lời**
+
+Demo 12:30–13:00. Dừng thao tác tạo dữ liệu, chuyển slide Q&A. Nếu cancel còn chờ thì nói rõ, không báo đã reset thành công.
+
+**Nguồn đối chiếu:** ui/app.py; docs/EMPLOYEE_DEMO.md; docs/SIMULATION.md
+
+### Slide 27: Trao đổi và phản biện
+
+**Người nói:** Cả nhóm, Trịnh Đức Dương điều phối
+
+**Mốc thời gian:** Q&A 00:00–10:00
+
+**Lời thoại**
+
+Mời thầy cô và các bạn đặt câu hỏi. Dương nhắc lại câu hỏi ngắn gọn, chuyển cho người phụ trách rồi bổ sung nếu cần. Hiệp trả lời drift, evaluation và nhãn. Hải trả lời tích hợp, CI/CD và vận hành. Đức mở đúng slide phụ lục hoặc evidence. Mỗi câu hỏi thường trả lời trong khoảng một phút đến một phút rưỡi để dành thời gian cho câu hỏi tiếp theo. Nếu chưa có câu hỏi, dùng câu hỏi dự phòng trong QA_GUIDE.md, không tự hỏi và đọc hết cả danh sách.
+
+**Thao tác / chuyển lời**
+
+Bắt đầu đồng hồ Q&A riêng. Khi còn một phút, nhận câu cuối và kết luận.
+
+**Nguồn đối chiếu:** CONTRIBUTING.md; ARCHITECTURE.md
+
+### Slide 28: Phụ lục: công thức và dữ liệu đầu vào
+
+**Người nói:** Do Quang Hiep
+
+**Mốc thời gian:** Mở theo câu hỏi, không tính thêm thời gian
+
+**Lời thoại**
+
+PSI so sánh tỷ lệ quan sát trong các bin đã xác định từ reference. Nó được dùng cho feature chất lượng và score scalar. MMD sử dụng khoảng cách giữa các vector chuẩn hóa thông qua kernel RBF để đánh giá phân phối đa chiều. FMR và FNMR chỉ lấy nhãn reviewed đáng tin cậy, không lấy quyết định model làm nhãn. EER là ước lượng từ điểm giao ROC thực nghiệm, còn TAR tại FAR là TAR tốt nhất thỏa budget trên tập quan sát. Mẫu hữu hạn không đủ để suy ra bảo đảm FAR cho toàn bộ dân số.
+
+**Thao tác / chuyển lời**
+
+Chỉ mở khi cần giải thích phương pháp check drift hoặc input/output.
+
+**Nguồn đối chiếu:** pipeline/drift_decision.py
+
+### Slide 29: Phụ lục: cấu hình thật và cấu hình simulation
+
+**Người nói:** Do Quang Hiep
+
+**Mốc thời gian:** Mở theo câu hỏi, không tính thêm thời gian
+
+**Lời thoại**
+
+Simulation rút ngắn thời gian và số mẫu để phù hợp demo trên lớp, đồng thời cho phép mức disagreement cao hơn vì kịch bản hiệu chỉnh ngưỡng được dựng khá lớn. Nó không sửa file cấu hình production. Các stage traffic vẫn là 5, 10, 25, 50 và 100 phần trăm. Những giá trị mặc định production trong bảng cũng là pilot settings cần hiệu chỉnh bằng dữ liệu khách hàng, không phải tiêu chuẩn an toàn đã được chứng minh cho mọi tổ chức.
+
+**Thao tác / chuyển lời**
+
+Dùng để trả lời vì sao demo chỉ chạy vài phút trong khi stage thật cần một giờ.
+
+**Nguồn đối chiếu:** pipeline/lifecycle_config.json; docs/SIMULATION.md
+
+### Slide 30: Phụ lục: bốn câu hỏi dễ bị hiểu nhầm
+
+**Người nói:** Trịnh Đức Dương
+
+**Mốc thời gian:** Mở theo câu hỏi, không tính thêm thời gian
+
+**Lời thoại**
+
+Khi trả lời, luôn nêu đúng đối tượng. Từ model trong lifecycle này chỉ threshold policy, không phải mọi thành phần pretrained. Từ canary chỉ policy routing trong API, không phải nhiều phiên bản container. Từ simulation nói tới dữ liệu tổng hợp nhưng có các thao tác HTTP, alert và Registry thực trong môi trường riêng. Một lần demo thành công chỉ chứng minh luồng đó chạy với dữ liệu đó. Nếu được hỏi model tốt nhất, giải thích champion là policy được chấp nhận theo gate và bằng chứng hiện có, không phải tối ưu tuyệt đối cho mọi phân phối tương lai.
+
+**Thao tác / chuyển lời**
+
+Có thể dùng trang này như tờ nhắc trước khi bảo vệ.
+
+**Nguồn đối chiếu:** ARCHITECTURE.md; docs/SIMULATION.md; docs/MODALITY_LIFECYCLE.md
+
+### Slide 31: Bằng chứng hiện có tập trung vào luồng và tính an toàn
+
+**Người nói:** Ngo Anh Duc
+
+**Mốc thời gian:** Mở theo câu hỏi, không tính thêm thời gian
+
+**Lời thoại**
+
+Nhóm phân loại bằng chứng thay vì gộp tất cả thành một con số accuracy. Lần kiểm chứng local được ghi nhận ngày 3 tháng 10 có 153 test pass, không skip, với coverage 82 phẩy 03 phần trăm trong phạm vi khai báo. Ngoài unit test, hai kịch bản simulation đã chạy qua Airflow, nhận alert thật, dùng HTTP traffic và cập nhật MLflow riêng. Những bằng chứng này cho thấy cơ chế vận hành và các gate có thể được kiểm tra. Chúng không chứng minh tỷ lệ phát hiện gian lận trên nhân viên thật. Tiếp theo nhóm sẽ minh họa đúng hai kịch bản đó, với dữ liệu được gắn nhãn tổng hợp rõ ràng.
+
+**Thao tác / chuyển lời**
+
+Nếu được hỏi CI mới nhất, mở đúng run thực tế; không suy từ số test local thành trạng thái CI hiện tại.
+
+**Nguồn đối chiếu:** docs/archive/presentation-2026-10-04 (evidence slide ngày 03/10; bản lưu lịch sử); reports/simulation-verification.json
+
+### Slide 32: Trách nhiệm được chia theo các phần của hệ thống
+
+**Người nói:** Ngo Anh Duc
+
+**Mốc thời gian:** Mở theo câu hỏi, không tính thêm thời gian
+
+**Lời thoại**
+
+Đây là phân công trách nhiệm để nhóm duy trì và bàn giao dự án. Dương phụ trách core service và vòng đời model. Hiệp phụ trách kiểm chứng chất lượng, evaluation và evidence. Hải phụ trách container, runner và triển khai. Đức phụ trách báo cáo, sơ đồ, slide và tổ chức demo. Việc phân công này cần được chứng minh bằng phần việc và review thực tế; nhóm không dùng riêng metadata Git để thay thế bằng chứng đóng góp. Khi bảo vệ, mỗi thành viên cần giải thích được phần mình và mối nối với toàn bộ hệ thống.
+
+**Thao tác / chuyển lời**
+
+Không đọc email hoặc đưa lịch sử rewrite Git lên slide trình bày chính.
+
+**Nguồn đối chiếu:** CONTRIBUTING.md
+
+### Slide 33: Phụ lục: nguồn và cách đối chiếu bằng chứng
+
+**Người nói:** Ngo Anh Duc
+
+**Mốc thời gian:** Mở theo câu hỏi, không tính thêm thời gian
+
+**Lời thoại**
+
+Nguồn của bộ slide là implementation và tài liệu hiện có trong repository. Evidence simulation được đối chiếu với báo cáo đã lưu, nhưng bản thuyết trình chỉ đưa số liệu tổng hợp, không chứa credentials hoặc biometric media. Các số liệu có ngày kiểm chứng để tránh nhầm với trạng thái runtime hiện tại. Nếu cần công bố accuracy hoặc tác động giảm gian lận, nhóm phải thực hiện nghiên cứu riêng trên dữ liệu được phép sử dụng. Không có tuyên bố đó trong bộ slide này.
+
+**Thao tác / chuyển lời**
+
+Repo công khai: https://github.com/FSB-MSA36HN/DDM501-face-voice-proctoring
+
+**Nguồn đối chiếu:** https://github.com/FSB-MSA36HN/DDM501-face-voice-proctoring; docs/EVIDENCE.md
+
+## Khi demo không diễn ra như dự kiến
+
+| Tình huống | Xử lý và câu nói |
+|---|---|
+| Queue chờ hơn một phút | Kiểm tra scheduler và DAG. Nói: “Job đang chờ Airflow nhận, đây chưa phải kết quả gate.” |
+| Chưa nhận alert | Xem Prometheus/Alertmanager và alert receipt. Không bỏ gate chờ alert hoặc bấm lại liên tục. |
+| Promotion chưa xong trong khung giờ | Nói: “Lượt hiện tại còn chạy. Em chuyển sang evidence đã lưu ngày 03/10 để giữ thời lượng.” Mở slide 23. |
+| FAILED_CANARY trong scenario rollback | Đây là kết quả mong đợi. Chỉ failure metric, traffic zero và probe dùng champion. |
+| FAILED do hạ tầng | Nói rõ đây là lỗi hạ tầng, không đổi tên thành rollback thành công. Dùng evidence lịch sử rồi reset khi bước active dừng. |
+| Reset đang chờ | Đợi bước đang chạy kết thúc/cancel. Không xóa DB, container volume hoặc giả định trạng thái đã reset. |
+
+## Câu hỏi dự kiến và câu trả lời ngắn
+
+**Tại sao phải dùng cả Face và Voice?** Hai modality cung cấp bằng chứng danh tính khác nhau cho bối cảnh có ảnh và phần nói. Nhóm chưa có benchmark để khẳng định một tỷ lệ cải thiện accuracy cụ thể so với chỉ một modality.
+
+**Có bắt được mọi cheating không?** Không. Phạm vi là danh tính và tín hiệu integrity trên các capture được gửi. Đọc tài liệu ngoài màn hình, gợi ý bên ngoài và mọi kiểu deepfake không được bảo đảm phát hiện.
+
+**Champion có phải model tốt nhất không?** Là policy được chấp nhận theo gate và bằng chứng hiện có để phục vụ. Không phải tối ưu tuyệt đối trên mọi dữ liệu tương lai. Challenger vẫn cần offline, shadow và canary.
+
+**Vì sao score của champion và challenger bằng nhau?** Encoder và cosine được dùng chung. Policy hiện khác ở threshold, nên score bằng nhau nhưng decision có thể khác.
+
+**Data drift có tự retrain không?** Một tín hiệu thống kê riêng lẻ không đủ. Cần persistence, trusted performance degradation, đủ dữ liệu mới, nhiều cohort và không chủ yếu do input/template aging.
+
+**Embedding được lưu ở đâu?** PostgreSQL dạng JSON. Đây là verification 1:1 theo employee đã khai báo, không phải nearest-neighbor search toàn bộ nhân viên.
+
+**Thiếu nhãn thì làm gì?** Trả INSUFFICIENT_DATA hoặc dừng progression để thu review phù hợp. Không dùng accept/reject của model làm ground truth.
+
+**Simulation có ảnh hưởng hệ thống thật không?** Dữ liệu, DB và MLflow riêng; không đổi production policies. Host và Airflow dùng chung nên có thể ảnh hưởng tài nguyên/latency. Không khẳng định cách ly phần cứng.
+
+**Demo canary thành công chứng minh điều gì?** Chứng minh routing, gates và Registry transitions chạy trên dữ liệu synthetic. Không chứng minh mức FAR/FNMR trong dân số hoặc accuracy trên người thật.
+
+**Tại sao không dùng ngưỡng 20% trong báo cáo cũ?** Đó là gate của bundle demo lịch sử. Lifecycle mới dùng cấu hình per-modality tại `pipeline/lifecycle_config.json`; cần gắn mọi con số với đúng phiên bản.
+
+**50.000 nhân viên đã chạy được chưa?** Chưa có load/concurrency benchmark ở quy mô đó. Cần xác định lịch thi, số request đồng thời, sizing và retention trước pilot.
+
+**Ai quyết định nhân viên gian lận?** Dịch vụ trả tín hiệu, lý do và bằng chứng. Khách hàng quyết định nghiệp vụ theo quy trình review, không tự động kỷ luật từ nhãn suspicious.
+
+## Cách rút ngắn nếu gần hết giờ
+
+Giữ câu chuyện, sơ đồ I/O, decision engine, lifecycle và một kịch bản demo. Rút phần bảng feature/kiến trúc chi tiết, dùng evidence lịch sử thay cho kịch bản live thứ hai. Không cắt câu phân biệt dữ liệu tổng hợp với benchmark thật hoặc phần giới hạn của dự án.

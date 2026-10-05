@@ -11,13 +11,25 @@ from pathlib import Path
 import requests
 
 ROOT = Path(__file__).resolve().parents[1]
+TEAM_REPOSITORY = 'FSB-MSA36HN/DDM501-face-voice-proctoring'
+
+
+def repository():
+    remotes = subprocess.run(['git', 'remote'], cwd=ROOT, capture_output=True,
+                             text=True, check=True).stdout.splitlines()
+    name = 'fsb' if 'fsb' in remotes else 'origin'
+    if name not in remotes:
+        raise ValueError('Configure an HTTPS remote for the FSB team repository')
+    remote = subprocess.run(['git', 'remote', 'get-url', name], cwd=ROOT,
+                            capture_output=True, text=True, check=True).stdout.strip()
+    match = re.fullmatch(r'https://github.com/([^/]+/[^/]+?)(?:\.git)?',remote)
+    if not match or match[1].lower() != TEAM_REPOSITORY.lower():
+        raise ValueError(f'Remote {name} must point to the FSB team repository over HTTPS')
+    return TEAM_REPOSITORY
 
 
 def client():
-    remote = subprocess.run(['git','remote','get-url','origin'],cwd=ROOT,capture_output=True,text=True,check=True).stdout.strip()
-    match = re.fullmatch(r'https://github.com/([^/]+/[^/]+?)(?:\.git)?',remote)
-    if not match:
-        raise ValueError('Expected the configured HTTPS GitHub origin')
+    repo = repository()
     credential = subprocess.run(['git','credential','fill'],input='protocol=https\nhost=github.com\n\n',
         capture_output=True,text=True,env={**os.environ,'GIT_TERMINAL_PROMPT':'0','GCM_INTERACTIVE':'never'},timeout=30)
     entries = dict(line.split('=',1) for line in credential.stdout.splitlines() if '=' in line)
@@ -25,7 +37,7 @@ def client():
         raise ValueError('Git Credential Manager does not contain GitHub authorization')
     session = requests.Session()
     session.headers.update({'Authorization':'Bearer '+entries['password'],'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
-    return session, match[1]
+    return session, repo
 
 
 def call(session, method, path, **kwargs):

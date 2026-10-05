@@ -1,3 +1,6 @@
+> HISTORICAL PLAN / SPEC: retained for design history, not current runtime status.
+> See [current documentation](../../README.md) for implementation, commands and evidence.
+
 # Company verification maintenance implementation plan
 
 **Goal:** Deliver the approved batch verification service and company portal while preserving the course MLOps pipeline.

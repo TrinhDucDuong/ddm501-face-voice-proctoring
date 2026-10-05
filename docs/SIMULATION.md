@@ -36,8 +36,9 @@ is separate from production MLflow, browsable at http://localhost:15031. Synthet
 artifacts remain on the simulation volume, not the production MinIO data lake.
 
 The simulation alert route goes to `http://simulation:8000/alerts`, with no Telegram
-receiver. Training waits for the alert for that run to arrive. Prometheus labels
-contain only modality, synthetic flag and a simulation run UUID, no employee data.
+receiver. Training waits for the alert for that run to arrive. Alert correlation
+uses a simulation run UUID; aggregate evidence metrics use bounded scenario,
+modality, stage and metric labels. No employee data or vectors are exposed as labels.
 
 The host and Airflow scheduler remain shared. Container CPU/memory limits reduce
 contention but do not establish a production latency SLA. Never use `down -v` to
@@ -80,6 +81,89 @@ but disables the active retrain signal and restores baseline policy selection.
 Airflow: http://localhost:18081/dags/biometric_simulation/grid
 
 MLflow simulation: http://localhost:15031
+
+## Grafana simulation evidence
+
+Open http://localhost:13000/d/biometric-simulation (local Grafana login: admin/admin).
+Choose one **Scenario** and one **Modality** to keep the ten panels readable.
+This is a separate, explicitly SYNTHETIC dashboard; the production overview still
+requires actual production observations and human review labels.
+
+| Case | Action | Evidence in Grafana |
+|---|---|---|
+| Healthy baseline | Prepared automatically before each run | W0 drift report; retrain required = 0 |
+| Persistent drift | Three independent windows in either scenario | W1-W3 PSI/MMD2, genuine score drop, consecutive windows 1/2/3; retrain required = 1 at W3 |
+| Alert and threshold retraining | Airflow waits for Alertmanager delivery, then calibrates | Alert received = 1; offline champion/candidate FMR, FNMR, EER on identical holdout |
+| Successful rollout | Select Face or Voice, press button 1 | Shadow then canary 5/10/25/50/100; 200 HTTP samples per stage; result = 1 (promoted) |
+| Security regression | Select Face or Voice, press button 2 | Candidate FMR rises at CANARY_25; result = 2 (rolled back); rollback probe candidate samples = 0 |
+| Restore baseline | Press button 3 after each run | Baseline restored = 1; live canary and retrain signals return to 0; historical evidence remains |
+
+To execute both rollout outcomes for both modalities, with assertions and baseline
+restoration after every run, execute from the repository root:
+
+```powershell
+.venv/Scripts/python.exe -m pipeline.verify_simulation --execute --all-modalities
+```
+
+Requires the running stack and platform `API_KEY` in `.env`. The verifier refuses
+to interrupt an active simulation. It writes `reports/simulation-verification.json`
+and `reports/simulation-{promotion|rollback}-{face|voice}.json`, including run IDs,
+Airflow references, alert receipts, stage counts and full JSON artifacts. It also
+asserts that the production lifecycle state is unchanged.
+
+`simulation_evidence_*` metrics are read from the existing lab SQLite/JSON evidence,
+not invented independently by Grafana. All have `synthetic="true"`. Labels use
+bounded scenario, modality, window, phase and metric values, without employee IDs
+or embeddings. The latest run per scenario/modality among the latest 20 runs is
+exported; reset preserves the pre-reset result. A newer run replaces the snapshot
+for that pair. Check the **Evidence run started at** panel: a retained snapshot is
+not fresh production traffic. Missing evidence remains missing. Full historical
+JSON remains accessible through the authenticated simulation evidence API.
+
+Prometheus scrapes every 15 seconds. The per-stage panels retain all stages even
+if the live time series misses a short stage. For a slower classroom demonstration,
+set `SIMULATION_STAGE_SECONDS=20` on the simulation service via a Compose override;
+the service default is 5 seconds. Restart only while no simulation is active.
+The local monitoring preview uses this 20-second setting.
+
+Dashboard source: `pipeline/build_simulation_dashboard.py`; regenerate with
+`python pipeline/build_simulation_dashboard.py`. Compose automatically provisions
+`monitoring/grafana/dashboards/biometric-simulation.json` on a normal deployment.
+The local preview runs the updated simulation image and both dashboards through
+`%LOCALAPPDATA%/DDM501/monitoring-preview/compose.json`, layered over the existing
+deployment Compose file. No production container image or data volume is replaced.
+Deploy this checkout normally to make the changes part of the next release.
+
+These scenarios demonstrate threshold-policy calibration and orchestration, not
+encoder retraining. FMR/FNMR values on deliberately separable synthetic vectors
+are not evidence of accuracy on real employees. Production panels for human labels
+and encoder verification latency can remain empty until real data is available.
+
+### Recorded local verification: 2026-10-04
+
+Seed 501, minimum 20 seconds per stage. All four Airflow DAG runs succeeded;
+all received actual Prometheus/Alertmanager notifications and passed reset checks.
+
+| Modality | Scenario | Run ID | Outcome |
+|---|---|---|---|
+| Voice | promotion | `06dcd24d-0bfe-4667-9791-924456653862` | SUCCEEDED, canary through 100% |
+| Face | rollback | `1e17fc9a-9db7-4fa6-b57a-a6130356a7c4` | ROLLED_BACK at 25% |
+| Face | promotion | `f819f41e-9254-44bf-8e69-d605b2f6e7c6` | SUCCEEDED, canary through 100% |
+| Voice | rollback | `1187a0ca-45cb-4ff0-a251-a5aeb088c626` | ROLLED_BACK at 25% |
+
+Observed: genuine mean 0.90 -> 0.60, impostor mean 0.10 -> 0.35,
+embedding MMD2 approximately 0.120 (>0.02), stable quality PSI 0.
+The calibrated threshold was approximately 0.401 versus baseline 0.8.
+Offline FNMR improved from 1.0 to 0.0, with FMR 0.0 for both policies.
+Failure injection raised challenger FMR to 1.0 at 25%; each rollback probe served
+200 incumbent responses and zero challenger responses. These extreme distributions
+are intentional classroom fixtures, not realistic estimates of employee error rates.
+
+Validation: 163 repository tests passed; all 17 queries across the 10 simulation
+panels returned finite data; rendered promotion/rollback dashboards had no JavaScript
+errors. The existing production monitoring verifier passed all four checks. The
+scenario verifier confirmed unchanged production lifecycle policies. JSON evidence
+and dashboard screenshots are under the local ignored `reports/` directory.
 
 The runner endpoints are internal and require `SIMULATION_SERVICE_KEY`. Replace
 the development default when exposing this classroom stack beyond localhost.

@@ -9,7 +9,7 @@ import requests
 from dotenv import load_dotenv
 
 
-def verify(base, key, timeout=600):
+def verify(base, key, timeout=600, all_modalities=False):
     session = requests.Session()
     session.headers['X-API-Key'] = key
 
@@ -26,7 +26,10 @@ def verify(base, key, timeout=600):
     if state['current']:
         call('POST', prefix + '/reset')
     results = []
-    for scenario, modality in [('promotion', 'voice'), ('rollback', 'face')]:
+    scenarios = [('promotion', 'voice'), ('rollback', 'face')]
+    if all_modalities:
+        scenarios += [('promotion', 'face'), ('rollback', 'voice')]
+    for scenario, modality in scenarios:
         run = call('POST', prefix + '/runs', json={'scenario': scenario, 'modality': modality, 'seed': 501})
         deadline, phase = time.monotonic() + timeout, None
         while time.monotonic() < deadline:
@@ -40,7 +43,9 @@ def verify(base, key, timeout=600):
             time.sleep(3)
         report = call('GET', prefix + '/evidence/' + run['id'])
         Path('reports').mkdir(exist_ok=True)
-        Path(f'reports/simulation-{scenario}.json').write_text(json.dumps({'state': status, **report}, indent=2), encoding='utf-8')
+        evidence = json.dumps({'state': status, **report}, indent=2)
+        Path(f'reports/simulation-{scenario}.json').write_text(evidence, encoding='utf-8')
+        Path(f'reports/simulation-{scenario}-{modality}.json').write_text(evidence, encoding='utf-8')
         assert current['status'] == ('SUCCEEDED' if scenario == 'promotion' else 'ROLLED_BACK'), current
         assert current.get('airflow_run_id'), 'No Airflow run evidence'
         assert any(a['run_id'] == run['id'] and a['status'] == 'firing' for a in status['alerts']), 'No alert delivery'
@@ -63,7 +68,7 @@ def verify(base, key, timeout=600):
         assert reset['status'] == 'RESET'
         assert reset['deployment']['champion_version'] == current['baseline_version']
         assert reset['deployment']['traffic_percent'] == 0
-        results.append({'scenario': scenario, 'run_id': run['id'], 'outcome': current['status'],
+        results.append({'scenario': scenario, 'modality': modality, 'run_id': run['id'], 'outcome': current['status'],
                         'airflow_run_id': current['airflow_run_id'], 'reset': 'PASS'})
     after = call('GET', '/v1/admin/lifecycle/state')
     fields = ('modality', 'state', 'champion_version', 'challenger_version', 'traffic_percent')
@@ -78,6 +83,7 @@ def verify(base, key, timeout=600):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--execute', action='store_true', required=True, help='Run both isolated scenarios and reset them')
-    parser.parse_args()
+    parser.add_argument('--all-modalities', action='store_true', help='Run promotion and rollback for both Face and Voice')
+    args = parser.parse_args()
     load_dotenv()
-    verify(os.getenv('PUBLIC_API_URL', 'http://localhost:18100'), os.environ['API_KEY'])
+    verify(os.getenv('PUBLIC_API_URL', 'http://localhost:18100'), os.environ['API_KEY'], all_modalities=args.all_modalities)

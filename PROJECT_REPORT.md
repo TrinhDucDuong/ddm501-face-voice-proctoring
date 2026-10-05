@@ -1,68 +1,131 @@
-# Báo cáo dự án DDM501 - Face & Voice Integrity Service
+# Báo cáo dự án Face & Voice Integrity
 
-Ngày cập nhật: 29/09/2026. Phạm vi: demo môn học và MVP tích hợp thử cho doanh nghiệp.
+Cập nhật theo source ngày **05/10/2026**. [Mục lục tài liệu](docs/README.md)
+và [bằng chứng có ngày/phiên bản](docs/EVIDENCE.md) tách hướng dẫn hiện hành khỏi
+kết quả của những lần chạy trước.
 
-## 1. Câu chuyện business
+## Bài toán và phạm vi
 
-Doanh nghiệp tổ chức kỳ đánh giá năng lực ngoại ngữ thường niên cho nhân viên. Kết quả ảnh hưởng đến kế hoạch đào tạo và phân công công việc. Người thi hộ, thay người hoặc media giả làm giảm độ tin cậy của đánh giá. Phần mềm thi đã có câu hỏi, chấm điểm và xử lý nghiệp vụ; doanh nghiệp cần bổ sung dịch vụ kiểm tra danh tính mà không thay toàn bộ phần mềm.
+Một nhân viên đăng nhập đúng tài khoản nhưng người khác có thể làm thay phần nói
+trong kỳ đánh giá ngoại ngữ. HR khó xác minh lại nếu chỉ có bài làm và điểm số.
+Đây là tình huống giả định dẫn tới dự án, chưa phải sự cố hoặc tỷ lệ cheating được
+đo tại doanh nghiệp. Camera tối, mic kém và mẫu ghi danh cũ cũng có thể làm score
+giảm, nên một mismatch không đủ kết luận gian lận.
 
-Dự án cung cấp API xác minh face/voice theo nhân viên đã ghi danh, cùng portal cho quản trị công ty xem lịch sử và bằng chứng. Khách hàng tự quyết định lúc bắt đầu hoặc trong quá trình thi sẽ gửi media. Ví dụ mỗi 30 giây gửi một ảnh và WAV khoảng 10 giây; dịch vụ xử lý từng lượt và trả kết quả qua API/webhook. Không stream toàn bộ quá trình thi về nền tảng.
+Dịch vụ nhận batch ảnh/WAV theo lịch của phần mềm thi, xác minh danh tính 1:1 và
+trả tín hiệu integrity, lý do và bằng chứng. Khách hàng giữ đăng nhập, lịch thi,
+điểm và quyết định nghiệp vụ. Portal công ty quản lý nhân viên, mẫu ghi danh,
+integration keys, webhook, lịch sử và PDF/CSV. Đăng ký/subscription là giả lập.
 
-## 2. Phạm vi và trách nhiệm
+## Model, input/output và dữ liệu
 
-Hệ thống khách hàng quản lý bài thi, danh tính đăng nhập, lịch capture, điểm và quyết định nghiệp vụ. Dịch vụ này quản lý tenant, nhân viên, embedding, kiểm tra media, kết quả, bằng chứng nghi vấn và callbacks. Gói đăng ký được giả lập đang hoạt động, chưa có thanh toán thật hoặc SSO. Portal sử dụng API key quản trị công ty; integration key dành cho backend.
+YuNet phát hiện/căn chỉnh mặt; SFace và ECAPA-TDNN pretrained tạo embedding chuẩn
+hóa từ ảnh và WAV. API tính max cosine với các template của người được khai báo.
+Policy Face/Voice áp dụng ngưỡng riêng. MiniFASNet PAD, AASIST và heuristic voice
+segments bổ sung tín hiệu integrity; thiếu khả năng đánh giá trả inconclusive.
+Kết quả API là verified/suspicious/inconclusive, scores, reasons và phiên bản policy.
 
-Airflow điều phối snapshot dữ liệu, quality gate, calibration/evaluation, Responsible AI, promotion và reload model. Serving API và portal là các dịch vụ runtime của cùng nền tảng. Grafana/Evidently/Telegram dành cho đội vận hành toàn dự án. Portal công ty là monitoring nghiệp vụ với dữ liệu riêng theo tenant.
+Pipeline hiện **hiệu chỉnh threshold policy**, không fine-tune encoder hoặc detector.
+`face-verification` và `voice-verification` có lifecycle độc lập. Model
+`face-voice-risk-bundle` là bundle legacy, còn dùng làm nguồn incumbent khi migration;
+nó không phải encoder mới và không phải template riêng của từng nhân viên.
 
-## 3. Kiến trúc kỹ thuật
+Embedding/template JSON, checks, labels, outbox và lifecycle audit nằm trong
+PostgreSQL; không có vector DB riêng. MinIO chứa suspicious media, versioned
+training/monitoring snapshots và MLflow artifacts. Artifacts policy gồm cấu hình,
+metrics, paired scores, MLmodel và môi trường chạy; không phải weights encoder
+được train mới. Weights pretrained được tải pinned vào kho models của runtime.
+Raw enrollment và media check thường không được giữ mặc định.
 
-Khách hàng -> FastAPI /v1/checks -> SFace + ECAPA + integrity inspectors -> PostgreSQL + MinIO + transactional outbox -> webhook khách hàng.
+Training hiện chỉ cho tenant `demo`. Bootstrap ghép nguồn ảnh/giọng nói công khai
+thành identity tổng hợp, không chứng minh cùng một người ở hai modality. Số mẫu
+thay đổi theo snapshot, nên phải đọc manifest của run thay vì lấy một tổng cố định
+trong báo cáo. Evaluation chia 5 nhóm identity: 20% holdout, 80% calibration;
+4-fold CV trên phần 80% tương ứng 60/20/20 train/validation/holdout mỗi lượt.
+Final fit dùng 80%, đánh giá cuối dùng holdout 20%. Tỷ lệ tính theo identity,
+không bắt buộc bằng đúng tỷ lệ số file khi mỗi người có số mẫu khác nhau.
 
-PostgreSQL lưu công ty, nhân viên, embedding JSON, SHA256 mẫu, check ID, request ID, mã phiên khách hàng, thời gian, scores, capability details, kết quả và metadata bằng chứng. MinIO lưu artifact MLflow và ảnh/WAV của lượt suspicious. Raw media của lượt verified/inconclusive không giữ; enrollment giữ embedding theo cấu hình mặc định. Bằng chứng tải qua API có xác thực; object keys không đưa vào kết quả/public URLs.
+## Drift và quyết định hành động
 
-API tenant-scoped, key lưu digest, namespace mã nhân viên theo công ty. Cùng EMP-001 có thể tồn tại ở hai công ty. Retry cùng request ID và payload trả lại một kết quả; payload khác trả 409; unique constraint bảo vệ concurrency. Kết quả/check/event/outbox cùng DB transaction. Webhook ký HMAC timestamp, có retry và at-least-once delivery; receiver xác minh chữ ký và deduplicate webhook ID.
+Airflow monitoring hàng giờ gọi decision engine trong lifecycle service. Mỗi
+tenant/modality/policy version có reference và current riêng, mặc định 100+100
+observations. Reference được đóng băng; encoder phải tương thích và identity
+overlap ít nhất 80%. Query embedding retention tắt mặc định: thiếu vector/nhãn
+thì INSUFFICIENT_DATA, không mặc định model khỏe.
 
-## 4. Model và giới hạn khả năng
+Quality và genuine/impostor score dùng PSI 10 bins, threshold 0,2. Embedding dùng
+RBF MMD bình phương trên toàn vector chuẩn hóa, threshold 0,02. Performance dùng
+FMR/FNMR, EER, TAR@FAR từ nhãn review tin cậy; không dùng dự đoán làm ground truth.
+Template aging so lỗi theo tuổi mẫu. Công thức, feature và các điều kiện nằm trong
+[MODALITY_LIFECYCLE](docs/MODALITY_LIFECYCLE.md).
 
-SFace/YuNet và ECAPA cung cấp xác minh danh tính 1:1. Pipeline hiệu chỉnh threshold theo identity CV và holdout riêng; không train foundation encoders từ đầu. Champion identity hiện có bằng chứng version 9 ngày 28/09.
+Quality drift dẫn tới điều tra input. Thống kê embedding/score đơn lẻ chỉ yêu cầu
+theo dõi. Template cũ suy giảm theo heuristic và template mới khỏe dẫn tới workflow
+template: nhiều quan sát trusted, quality/margin/consistency gate, holdout riêng,
+version và rollback. Retrain cần embedding và score drift kéo dài, performance
+suy giảm qua ít nhất hai cohort tuổi, đủ labels và dữ liệu mới, ba cửa sổ mới,
+cooldown 24 giờ và không có lifecycle đang chạy cho modality đó.
 
-MiniFASNetV2 bổ sung single-image face PAD cho dấu hiệu print/screen replay. AASIST pretrained trên ASVspoof2019 logical access bổ sung dấu hiệu speech synthesis/voice conversion. Model được pin revision/checksum; source AASIST giữ MIT attribution. Segment ECAPA cung cấp heuristic nghi vấn thay người nói. Exact repeated capture của cùng nhân viên/phiên tạo dấu hiệu capture_reused.
+## Training và triển khai policy
 
-Những kiểm tra trên không bảo đảm nhận diện mọi deepfake/video, physical audio replay hoặc người nói đồng thời. Speaker consistency không phải diarization/đếm chính xác người nói. Chưa có benchmark anti-spoof trên dữ liệu khách hàng có consent; chưa có demographic fairness ground truth. Missing detector, capture không hợp lệ hoặc audio quá ngắn trả inconclusive, không giả lập detector thành passed. Suspicious là tín hiệu để khách hàng xử lý, không phải kết luận pháp lý về gian lận.
+Ba DAG có ba trách nhiệm: monitoring hàng giờ, model pipeline theo intent và
+simulation poll mỗi phút. `biometric_model_pipeline` có bảy task:
+snapshot, validate, publish dataset, calibrate/register, RAI report, offline gate,
+lifecycle tick. Airflow điều phối; code Python thực hiện calibration; MLflow theo
+dõi experiment và Registry. Tên task legacy không có nghĩa promote trực tiếp.
 
-## 5. Full flow MLOps
+Candidate và champion được so trên cùng holdout. Candidate đạt gate trở thành
+challenger và vào shadow; champion vẫn trả kết quả. Canary lần lượt 5/10/25/50/100%
+traffic dùng threshold mới. Mỗi stage production cần ít nhất 1.000 observations
+và 3.600 giây, 30 nhãn mỗi class, FMR <=1%, FNMR <=5%, không tăng FMR, FNMR tăng
+tối đa 0,5 điểm phần trăm, cùng gate latency/disagreement/cohort. Gate selection CV
+20% trong code calibration không phải ngân sách promotion này.
 
-Ghi danh/embedding -> fingerprinted snapshot -> validation -> max-template feature pairs -> calibration/CV/holdout -> MLflow params/metrics/artifacts/signature -> RAI audit -> gate -> candidate/champion -> API hot reload -> Prometheus/Grafana/Evidently -> Alertmanager/Telegram -> điều tra/cập nhật có kiểm soát.
+Fail canary đưa challenger traffic về 0 và giữ champion, lưu failure evidence.
+Pass stage cuối mới ghi PROMOTING, reconcile MLflow aliases rồi chuyển DB champion.
+Giữ previous_champion để rollback. Nhãn đến muộn được đánh giá theo tick hàng giờ;
+không bảo đảm rollback tức thời trước mọi sự cố. Hai policy dùng chung encoder
+và similarity nên score delta bằng 0; decision vẫn có thể khác do threshold.
 
-Training mặc định chỉ tenant demo. Bootstrap LFW + Speech Commands ghép tổng hợp phục vụ pipeline; không dùng kết quả đó để công bố accuracy đa phương thức thật. Identity holdout không tham gia chọn thresholds. Gate FAR/FRR 20% là gate demo. Auxiliary spoof detectors hiện pretrained/pinned, chưa được hiệu chỉnh hoặc promotion bằng benchmark anti-spoof địa phương; report phải tách hai loại evidence.
+## Monitoring, simulation và CI/CD
 
-## 6. Monitoring và alert
+Prometheus scrape API, worker, drift-monitor, ops-monitor và simulation. Grafana có
+System Overview 10 panel và Simulation 10 panel. Chi tiết RAI/evaluation/Evidently
+nằm ở report có xác thực, còn logs xem qua Loki/Explore. Vòng drift-monitor 60 giây
+chỉ báo cáo, không tạo trigger train thứ hai. Alertmanager định tuyến cảnh báo
+production tới ops-monitor/Telegram khi cấu hình, simulation tới receiver riêng.
 
-Monitoring nền tảng gồm readiness, requests/errors, latency, capture quality, PSI/Evidently, performance có human feedback, Registry/evaluation, DAG/tasks, RAI, CPU/RAM/logs, outbox và detector/evidence availability. Telegram chung nhận cảnh báo vận hành, không nhận lịch sử nhân viên của từng công ty.
+Simulation dùng vectors/labels tổng hợp, SQLite và file MLflow riêng, nhưng chạy
+logic calibration/gate, HTTP routing và nhận alert thật. Hai scenario là promotion
+và FMR regression tại canary 25% dẫn tới rollback; reset phục hồi baseline demo,
+giữ audit. Nó không đổi production policies, nhưng chia sẻ host/Airflow nên có thể
+tranh chấp tài nguyên. Xem [SIMULATION](docs/SIMULATION.md).
 
-Monitoring công ty gồm mã/tên nhân viên, mã phiên, các lượt check, thời điểm đầu/cuối đã nhận, trạng thái có nhãn, lý do và ảnh/audio nghi vấn. Khoảng thời gian đầu-cuối không chứng minh hệ thống đã giám sát liên tục giữa hai lượt. API/webhook gửi kết quả để backend khách hàng hành động. Portal cho xuất PDF/CSV theo nhân viên, phiên và khoảng ngày; không chứa điểm thi hoặc quyết định giám thị.
+GitHub Actions FSB chạy Ubuntu quality và Windows deployment-preflight, build
+containers, rồi trusted-main deploy qua Linux WSL runner gọi PowerShell/Docker
+Desktop. Application deployment là thay container trên một Compose host; canary
+là lựa chọn policy trong API. [EVIDENCE](docs/EVIDENCE.md) dẫn run và kết quả đã ghi
+nhận, không coi quality xanh hoặc simulation thành bằng chứng accuracy production.
 
-## 7. Demo và kiểm chứng
+## Responsible AI và giới hạn
 
-Đăng ký hai công ty; cấp integration keys; thêm nhân viên cùng mã ở cả hai; ghi danh; gửi media đúng và media người khác; kiểm tra identity và integrity signals riêng; xem webhook, evidence và lịch sử; xuất PDF/CSV; dùng key công ty thứ hai thử đọc check/evidence/export công ty thứ nhất để xác nhận từ chối. Media bootstrap là dữ liệu thử, không phải nhân viên thật hoặc nhãn human.
+Consent, tenant isolation, hashed keys, authenticated evidence, immutable prediction
+và review labels riêng giúp kiểm soát dữ liệu và audit. RAI report đánh giá quality
+slices với class counts và Wilson intervals; chưa chứng minh demographic fairness.
+DAG sinh report nhưng endpoint candidate modality chưa enforce cờ fairness legacy.
+Cần human review trước pilot; report tồn tại không chứng minh fairness gate đã chạy.
 
-GitHub Actions run 36562882154, executable commit 8b720fc: quality, containers và deploy-demo success; remote 65 tests, coverage 86,45%. Chi tiết trong VERIFICATION.md.
+Chưa có benchmark chống mọi deepfake/replay, load test 50.000 nhân viên, SSO/TLS/HA
+cloud hoàn chỉnh, quy trình xóa biometric end-to-end hay khởi tạo champion đã đánh
+giá một lệnh từ registry rỗng. Template rollback sau activation còn là thao tác
+operator. Các mục tiêu kinh doanh/cost là giả thuyết cần pilot đo, không phải ROI
+đã đạt được. Chi tiết tại [RAI](RESPONSIBLE_AI.md), [capacity/cost](SCALABILITY_COST.md)
+và [deployment](DEPLOYMENT.md).
 
-Kiểm chứng maintenance local: 65 tests pass, coverage 86,50%; 62 panels và 67 truy vấn Grafana; hai công ty được kiểm tra isolation, enrollment, batch identity, MinIO evidence, PDF/CSV và callbacks acknowledged HTTP 200. Streamlit AppTest kiểm tra sáu trang mỗi công ty và export CSV với API thật. Ảnh ghép hai khuôn mặt/audio ghép hai người tạo cảnh báo tương ứng. Những dữ liệu bootstrap và audio kéo dài tổng hợp này không cung cấp accuracy anti-spoof hoặc fairness người dùng thật.
+## Nhóm và bàn giao
 
-## 8. Vận hành và hướng phát triển
-
-Deploy local ngoài OneDrive giữ nguyên secrets, named volumes và runtime dữ liệu. Runner Windows đã đăng ký; chạy theo phiên người dùng, chưa là Windows service. Có backup/restore và model rollback rehearsal từ đợt trước. Data giữ khi công ty đăng ký gói giả lập active; deactivation chặn tenant access và giữ lịch sử, chưa triển khai tự động xoá theo hợp đồng.
-
-Hướng phát triển: benchmark anti-spoof có consent, diarization/overlap detector, temporal challenge cho replay/deepfake, identity validation khi onboarding, SSO, billing, retention/deletion và cloud/TLS/capacity pilot. Business benefits về giảm gian lận chưa đo trên doanh nghiệp thật. Thành viên phải bổ sung tên và đóng góp thật theo CONTRIBUTING.md; không dựng bằng chứng team.
-
-## 9. Tài liệu và nguồn tham khảo
-
-- PROJECT_REQUIREMENTS.md, ARCHITECTURE.md, SAAS_INTEGRATION.md: scope và hợp đồng hệ thống.
-- RUBRIC_MAPPING.md, MONITORING_MAPPING.md, VERIFICATION.md: tiêu chí môn học và bằng chứng.
-- OPERATIONS.md, DEPLOYMENT.md, RESPONSIBLE_AI.md: vận hành, triển khai và giới hạn.
-- SFace/YuNet: https://github.com/opencv/opencv_zoo
-- ECAPA: https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb
-- MiniFASNet: https://github.com/minivision-ai/Silent-Face-Anti-Spoofing
-- AASIST (Jung et al.): https://arxiv.org/abs/2110.01200 và https://github.com/clovaai/aasist
-- Pipeline requirement và rubric gốc: ddm501-final-project-required/.
+[CONTRIBUTING](CONTRIBUTING.md) ghi trách nhiệm bốn thành viên và quy trình branch/PR.
+Bằng chứng đóng góp phải là công việc, review và demo thực tế; metadata Git riêng
+lẻ không thay thế bằng chứng đó. Bộ [trình bày](DEMO_PRESENTATION.md) dùng 15 phút
+present, 10–15 phút demo, 10 phút Q&A. [RUBRIC_MAPPING](RUBRIC_MAPPING.md) đối chiếu
+đề bài mà không tự gán điểm hoặc tuyên bố production-ready.

@@ -1,3 +1,6 @@
+> HISTORICAL PLAN / SPEC: retained for design history, not current runtime status.
+> See [current documentation](../../README.md) for implementation, commands and evidence.
+
 # Independent Biometric Lifecycle Implementation Plan
 
 Goal: extend the existing service, Airflow, MLflow, MinIO and monitoring; preserve API
